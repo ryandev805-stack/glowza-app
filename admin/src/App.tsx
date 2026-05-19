@@ -1,0 +1,266 @@
+import { useEffect, useMemo, useState } from 'react';
+import { isAdminLoggedIn, loginAdmin, logoutAdmin } from './auth';
+import { BannersPage } from './pages/BannersPage';
+import { CategoriesPage } from './pages/CategoriesPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { OrdersPage } from './pages/OrdersPage';
+import { ProductEditorPage, ProductsPage } from './pages/ProductsPage';
+import { ReviewsPage } from './pages/ReviewsPage';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { UsersPage } from './pages/UsersPage';
+
+type RouteId =
+  | 'dashboard'
+  | 'products'
+  | 'product-new'
+  | 'product-edit'
+  | 'categories'
+  | 'banners'
+  | 'orders'
+  | 'order-detail'
+  | 'reviews'
+  | 'notifications'
+  | 'users';
+
+type AppRoute = {
+  id: RouteId;
+  title: string;
+  path: string;
+  section: string;
+  productId?: string;
+  orderId?: string;
+};
+
+const navItems = [
+  { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'D' },
+  { id: 'products', label: 'Products', path: '/products', icon: 'P' },
+  { id: 'categories', label: 'Categories', path: '/categories', icon: 'C' },
+  { id: 'banners', label: 'Banners', path: '/banners', icon: 'B' },
+  { id: 'orders', label: 'Orders', path: '/orders', icon: 'O' },
+  { id: 'reviews', label: 'Reviews', path: '/reviews', icon: 'R' },
+  { id: 'notifications', label: 'Notify', path: '/notifications', icon: 'N' },
+  { id: 'users', label: 'Users', path: '/users', icon: 'U' },
+] as const;
+
+function parseRoute(pathname: string): AppRoute {
+  const path = pathname === '/' ? '/dashboard' : pathname;
+  const productEdit = path.match(/^\/products\/([^/]+)\/edit$/);
+  const orderDetail = path.match(/^\/orders\/([^/]+)$/);
+
+  if (path === '/products/new') {
+    return { id: 'product-new', title: 'New Product', path, section: 'products' };
+  }
+  if (productEdit) {
+    return {
+      id: 'product-edit',
+      title: 'Edit Product',
+      path,
+      section: 'products',
+      productId: decodeURIComponent(productEdit[1]),
+    };
+  }
+  if (orderDetail) {
+    return {
+      id: 'order-detail',
+      title: 'Order Detail',
+      path,
+      section: 'orders',
+      orderId: decodeURIComponent(orderDetail[1]),
+    };
+  }
+  if (path === '/products') return { id: 'products', title: 'Products', path, section: 'products' };
+  if (path === '/categories') return { id: 'categories', title: 'Categories', path, section: 'categories' };
+  if (path === '/banners') return { id: 'banners', title: 'Banners', path, section: 'banners' };
+  if (path === '/orders') return { id: 'orders', title: 'Orders', path, section: 'orders' };
+  if (path === '/reviews') return { id: 'reviews', title: 'Reviews', path, section: 'reviews' };
+  if (path === '/notifications') return { id: 'notifications', title: 'Notifications', path, section: 'notifications' };
+  if (path === '/users') return { id: 'users', title: 'Users', path, section: 'users' };
+  return { id: 'dashboard', title: 'Dashboard', path: '/dashboard', section: 'dashboard' };
+}
+
+function useAdminRoute() {
+  const [route, setRoute] = useState(() => parseRoute(window.location.pathname));
+
+  useEffect(() => {
+    const onPop = () => setRoute(parseRoute(window.location.pathname));
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const navigate = (path: string) => {
+    window.history.pushState({}, '', path);
+    setRoute(parseRoute(path));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return { route, navigate };
+}
+
+export function App() {
+  const [loggedIn, setLoggedIn] = useState(isAdminLoggedIn());
+  const { route, navigate } = useAdminRoute();
+
+  useEffect(() => {
+    if (loggedIn && window.location.pathname === '/') {
+      navigate('/dashboard');
+    }
+  }, [loggedIn]);
+
+  if (!loggedIn) {
+    return <LoginPage onLogin={() => { setLoggedIn(true); navigate('/dashboard'); }} />;
+  }
+
+  return (
+    <div className="admin-shell">
+      <aside className="admin-sidebar">
+        <BrandBlock subtitle="Admin Console" />
+        <nav className="admin-nav" aria-label="Admin sections">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              className={route.section === item.id ? 'active' : ''}
+              onClick={() => navigate(item.path)}
+            >
+              <span>{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <button
+          className="ghost logout"
+          onClick={() => {
+            logoutAdmin();
+            setLoggedIn(false);
+          }}
+        >
+          Logout
+        </button>
+      </aside>
+
+      <div className="admin-workspace">
+        <header className="admin-topbar">
+          <BrandBlock subtitle={route.title} />
+          <div className="topbar-actions">
+            <button className="ghost" onClick={() => navigate('/products/new')}>New Product</button>
+            <button
+              className="ghost"
+              onClick={() => {
+                logoutAdmin();
+                setLoggedIn(false);
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        </header>
+
+        <main className="admin-content">
+          <RouteView route={route} navigate={navigate} />
+        </main>
+
+        <nav className="mobile-tabs" aria-label="Admin mobile navigation">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              className={route.section === item.id ? 'active' : ''}
+              onClick={() => navigate(item.path)}
+            >
+              <span>{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+    </div>
+  );
+}
+
+function RouteView({
+  route,
+  navigate,
+}: {
+  route: AppRoute;
+  navigate: (path: string) => void;
+}) {
+  const actions = useMemo(
+    () => ({
+      dashboard: () => navigate('/dashboard'),
+      products: () => navigate('/products'),
+      newProduct: () => navigate('/products/new'),
+      editProduct: (id: string) => navigate(`/products/${encodeURIComponent(id)}/edit`),
+      categories: () => navigate('/categories'),
+      banners: () => navigate('/banners'),
+      orders: () => navigate('/orders'),
+      orderDetail: (id: string) => navigate(`/orders/${encodeURIComponent(id)}`),
+      reviews: () => navigate('/reviews'),
+      notifications: () => navigate('/notifications'),
+      users: () => navigate('/users'),
+    }),
+    [navigate],
+  );
+
+  switch (route.id) {
+    case 'products':
+      return <ProductsPage onCreate={actions.newProduct} onEdit={actions.editProduct} />;
+    case 'product-new':
+      return <ProductEditorPage onDone={actions.products} />;
+    case 'product-edit':
+      return <ProductEditorPage productId={route.productId} onDone={actions.products} />;
+    case 'categories':
+      return <CategoriesPage />;
+    case 'banners':
+      return <BannersPage />;
+    case 'orders':
+      return <OrdersPage onView={actions.orderDetail} onBack={actions.orders} />;
+    case 'order-detail':
+      return <OrdersPage orderId={route.orderId} onView={actions.orderDetail} onBack={actions.orders} />;
+    case 'reviews':
+      return <ReviewsPage />;
+    case 'notifications':
+      return <NotificationsPage />;
+    case 'users':
+      return <UsersPage />;
+    default:
+      return <DashboardPage onNavigate={navigate} />;
+  }
+}
+
+function BrandBlock({ subtitle }: { subtitle: string }) {
+  return (
+    <div className="brand">
+      <img className="brand-mark" src="/app_icon.png" alt="Glowza" />
+      <div>
+        <strong>Glowza</strong>
+        <span>{subtitle}</span>
+      </div>
+    </div>
+  );
+}
+
+function LoginPage({ onLogin }: { onLogin: () => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  return (
+    <main className="login">
+      <form
+        className="login-card"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (loginAdmin(email, password)) {
+            onLogin();
+          } else {
+            setError('Invalid admin login');
+          }
+        }}
+      >
+        <BrandBlock subtitle="Private management console" />
+        <label>Email<input value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+        <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+        {error && <p className="error">{error}</p>}
+        <button type="submit">Login</button>
+      </form>
+    </main>
+  );
+}

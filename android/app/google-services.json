@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "457230198022",
+    "project_id": "glowza-326ca",
+    "storage_bucket": "glowza-326ca.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:457230198022:android:ac86fd42a7234e7e1f2a87",
+        "android_client_info": {
+          "package_name": "com.example.glowza"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUoDl6CQ38WFoPHQKkFIOY8ZfE7erFe5Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:457230198022:android:00de5e280a9c44f01f2a87",
+        "android_client_info": {
+          "package_name": "com.glowza.shop"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUoDl6CQ38WFoPHQKkFIOY8ZfE7erFe5Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
