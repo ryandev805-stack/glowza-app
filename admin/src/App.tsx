@@ -6,6 +6,7 @@ import {
   ChartNoAxesCombined,
   Flag,
   FolderTree,
+  Images,
   LogOut,
   Menu,
   PackagePlus,
@@ -26,6 +27,7 @@ import { ReviewsPage } from './pages/ReviewsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { UsersPage } from './pages/UsersPage';
 import { WinningProductsPage } from './pages/WinningProductsPage';
+import { MediaPage } from './pages/MediaPage';
 
 type RouteId =
   | 'dashboard'
@@ -35,6 +37,7 @@ type RouteId =
   | 'product-edit'
   | 'categories'
   | 'banners'
+  | 'media'
   | 'orders'
   | 'order-detail'
   | 'reviews'
@@ -61,6 +64,7 @@ const navItems: Array<{
   { id: 'winning-products', label: 'Winning', path: '/winning-products', icon: ScanSearch },
   { id: 'categories', label: 'Categories', path: '/categories', icon: FolderTree },
   { id: 'banners', label: 'Banners', path: '/banners', icon: Flag },
+  { id: 'media', label: 'Media', path: '/media', icon: Images },
   { id: 'orders', label: 'Orders', path: '/orders', icon: ShoppingBag },
   { id: 'reviews', label: 'Reviews', path: '/reviews', icon: Star },
   { id: 'notifications', label: 'Notify', path: '/notifications', icon: Bell },
@@ -97,6 +101,7 @@ function parseRoute(pathname: string): AppRoute {
   if (path === '/winning-products') return { id: 'winning-products', title: 'Winning Products', path, section: 'winning-products' };
   if (path === '/categories') return { id: 'categories', title: 'Categories', path, section: 'categories' };
   if (path === '/banners') return { id: 'banners', title: 'Banners', path, section: 'banners' };
+  if (path === '/media') return { id: 'media', title: 'Media Manager', path, section: 'media' };
   if (path === '/orders') return { id: 'orders', title: 'Orders', path, section: 'orders' };
   if (path === '/reviews') return { id: 'reviews', title: 'Reviews', path, section: 'reviews' };
   if (path === '/notifications') return { id: 'notifications', title: 'Notifications', path, section: 'notifications' };
@@ -220,6 +225,7 @@ function RouteView({
       winningProducts: () => navigate('/winning-products'),
       categories: () => navigate('/categories'),
       banners: () => navigate('/banners'),
+      media: () => navigate('/media'),
       orders: () => navigate('/orders'),
       orderDetail: (id: string) => navigate(`/orders/${encodeURIComponent(id)}`),
       reviews: () => navigate('/reviews'),
@@ -242,6 +248,8 @@ function RouteView({
       return <CategoriesPage />;
     case 'banners':
       return <BannersPage />;
+    case 'media':
+      return <MediaPage />;
     case 'orders':
       return <OrdersPage onView={actions.orderDetail} onBack={actions.orders} />;
     case 'order-detail':

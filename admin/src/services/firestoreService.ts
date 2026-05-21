@@ -96,6 +96,95 @@ export async function saveBanner(input: Omit<Banner, 'id'> & { id?: string }) {
   return created.id;
 }
 
+function cloudinaryPublicId(url: string) {
+  try {
+    const parsed = new URL(url);
+    const afterUpload = parsed.pathname.split('/upload/')[1];
+    if (!afterUpload) return '';
+    const parts = afterUpload.split('/').filter(Boolean);
+    const glowzaIndex = parts.findIndex((part) => part === 'glowza');
+    const publicParts = parts.slice(glowzaIndex >= 0 ? glowzaIndex : parts[0]?.startsWith('v') ? 1 : 0);
+    return decodeURIComponent(publicParts.join('/').replace(/\.[a-z0-9]+$/i, ''));
+  } catch {
+    return '';
+  }
+}
+
+function isMissingCloudinaryUrl(url: string, existingPublicIds: Set<string>) {
+  if (!String(url || '').includes('res.cloudinary.com')) return false;
+  const publicId = cloudinaryPublicId(url);
+  return Boolean(publicId && !existingPublicIds.has(publicId));
+}
+
+function cleanMediaList(values: string[] | undefined, existingPublicIds: Set<string>) {
+  return Array.from(
+    new Set((values || []).map((value) => value.trim()).filter((value) => value && !isMissingCloudinaryUrl(value, existingPublicIds))),
+  );
+}
+
+export async function cleanMissingMediaReferences(existingPublicIds: Set<string>) {
+  const [products, categories, banners] = await Promise.all([
+    listProducts(),
+    listCategories(),
+    listBanners(),
+  ]);
+  const batch = writeBatch(db);
+  let cleanedProducts = 0;
+  let cleanedCategories = 0;
+  let cleanedBanners = 0;
+  let removedRefs = 0;
+
+  products.forEach((product) => {
+    const currentImages = Array.from(new Set([product.image, ...(product.images || [])].filter(Boolean)));
+    const currentVideos = product.videos || [];
+    const nextImages = cleanMediaList(currentImages, existingPublicIds);
+    const nextVideos = cleanMediaList(currentVideos, existingPublicIds);
+    const nextImage = !isMissingCloudinaryUrl(product.image || '', existingPublicIds)
+      ? product.image || nextImages[0] || ''
+      : nextImages[0] || '';
+    const removed = currentImages.length + currentVideos.length - nextImages.length - nextVideos.length;
+
+    if (removed > 0 || nextImage !== (product.image || '')) {
+      batch.update(doc(db, paths.products, product.id), {
+        image: nextImage,
+        images: nextImages,
+        videos: nextVideos,
+        updatedAt: serverTimestamp(),
+      });
+      cleanedProducts += 1;
+      removedRefs += Math.max(0, removed);
+    }
+  });
+
+  categories.forEach((category) => {
+    if (isMissingCloudinaryUrl(category.image || '', existingPublicIds)) {
+      batch.update(doc(db, paths.categories, category.id), {
+        image: '',
+        updatedAt: serverTimestamp(),
+      });
+      cleanedCategories += 1;
+      removedRefs += 1;
+    }
+  });
+
+  banners.forEach((banner) => {
+    if (isMissingCloudinaryUrl(banner.image || '', existingPublicIds)) {
+      batch.update(doc(db, paths.banners, banner.id), {
+        image: '',
+        updatedAt: serverTimestamp(),
+      });
+      cleanedBanners += 1;
+      removedRefs += 1;
+    }
+  });
+
+  if (cleanedProducts || cleanedCategories || cleanedBanners) {
+    await batch.commit();
+  }
+
+  return { cleanedProducts, cleanedCategories, cleanedBanners, removedRefs };
+}
+
 export async function deleteBanner(id: string) {
   await deleteDoc(doc(db, paths.banners, id));
 }

@@ -52,3 +52,36 @@ export async function importMediaUrlToCloudinary(mediaUrl: string): Promise<stri
   }
   return body.secureUrl as string;
 }
+
+export type CloudinaryAsset = {
+  publicId: string;
+  resourceType: 'image' | 'video';
+  format: string;
+  bytes: number;
+  width: number;
+  height: number;
+  secureUrl: string;
+  createdAt: string;
+};
+
+export async function listCloudinaryAssets(): Promise<CloudinaryAsset[]> {
+  const response = await fetch('/api/cloudinary-assets');
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.error || 'Could not load Cloudinary assets');
+  }
+  return body.assets || [];
+}
+
+export async function deleteCloudinaryAssets(assets: Array<Pick<CloudinaryAsset, 'publicId' | 'resourceType'>>) {
+  const response = await fetch('/api/cloudinary-delete-assets', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ assets }),
+  });
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.error || 'Could not delete Cloudinary assets');
+  }
+  return body as { requested: number; deleted: Record<string, string> };
+}
