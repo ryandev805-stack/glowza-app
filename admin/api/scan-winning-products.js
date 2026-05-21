@@ -65,6 +65,37 @@ function normalizeMarkazProductUrl(url) {
   return clean;
 }
 
+function withPage(url, page) {
+  const nextUrl = new URL(url);
+  nextUrl.searchParams.set('page', String(page));
+  return nextUrl.toString();
+}
+
+async function collectProductUrls(categoryUrl, limit) {
+  const urls = [];
+  const seen = new Set();
+  const pages = [];
+  const maxPages = 8;
+  const targetUrlCount = Math.min(limit * 3, 60);
+
+  for (let page = 1; page <= maxPages && urls.length < targetUrlCount; page += 1) {
+    const pageUrl = withPage(categoryUrl, page);
+    const html = await fetchHtml(pageUrl);
+    const pageUrls = extractProductUrls(html, pageUrl);
+    pages.push({ page, url: pageUrl, count: pageUrls.length });
+
+    pageUrls.forEach((url) => {
+      if (urls.length >= targetUrlCount || seen.has(url)) return;
+      seen.add(url);
+      urls.push(url);
+    });
+
+    if (pageUrls.length === 0 && page > 1) break;
+  }
+
+  return { urls, pages };
+}
+
 function extractProductUrls(html, baseUrl) {
   const urls = new Set();
   const decoded = decodeHtml(html);
@@ -437,13 +468,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const html = await fetchHtml(categoryUrl);
     const limit = Math.min(Number(maxProducts) || 12, 30);
-    const urls = extractProductUrls(html, categoryUrl).slice(0, limit);
+    const { urls, pages } = await collectProductUrls(categoryUrl, limit);
     if (urls.length === 0) {
       res.status(422).json({
         error:
-          'No product detail links were found on this Markaz page. Try another category URL.',
+          'No product detail links were found after checking Markaz paginated category pages.',
+        scannedPages: pages,
       });
       return;
     }
@@ -466,13 +497,15 @@ export default async function handler(req, res) {
           duplicate: false,
         };
       })
-      .sort((a, b) => b.winningScore - a.winningScore);
+      .sort((a, b) => b.winningScore - a.winningScore)
+      .slice(0, limit);
 
     res.status(200).json({
       products,
       sourceCount: urls.length,
       detailFetchedCount: products.length,
       failedCount,
+      scannedPages: pages,
     });
   } catch (error) {
     res.status(500).json({

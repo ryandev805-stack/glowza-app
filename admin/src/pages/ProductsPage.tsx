@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { PlayCircle, RefreshCcw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, EyeOff, Flame, PlayCircle, RefreshCcw, ShieldCheck, Trash2, X } from 'lucide-react';
 import { ImageField } from '../components/ImageField';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { importImageUrlToCloudinary, importMediaUrlToCloudinary, uploadToCloudinary } from '../services/cloudinaryService';
@@ -88,6 +88,8 @@ export function ProductsPage({
   const active = products.items.filter((product) => product.isActive).length;
   const markazProducts = products.items.filter((product) => Boolean(product.sourceUrl));
   const selectedProducts = products.items.filter((product) => selectedIds.has(product.id));
+  const selectedActive = selectedProducts.filter((product) => product.isActive).length;
+  const selectedReview = selectedProducts.filter((product) => product.needsReview).length;
 
   useEffect(() => {
     setPage(1);
@@ -247,23 +249,41 @@ export function ProductsPage({
 
         {products.loading && <p>Loading products...</p>}
         {products.error && <p className="error">{products.error}</p>}
-        <div className="bulk-bar">
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={pagedProducts.length > 0 && pagedProducts.every((product) => selectedIds.has(product.id))}
-              onChange={togglePageSelected}
-            />
-            Select page
-          </label>
-          <span>{selectedProducts.length} selected</span>
-          <div className="bulk-actions">
-            <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('active')}>Make Active</button>
-            <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('hidden')}>Hide</button>
-            <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('review')}>Needs Review</button>
-            <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('clear-review')}>Clear Review</button>
-            <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('flash')}>Flash Sale</button>
-            <button className="danger" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('delete')}>Delete</button>
+        <div className={`bulk-bar pro-bulk-bar ${selectedIds.size ? 'has-selection' : ''}`}>
+          <div className="bulk-selection">
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={pagedProducts.length > 0 && pagedProducts.every((product) => selectedIds.has(product.id))}
+                onChange={togglePageSelected}
+              />
+              Select page
+            </label>
+            <div>
+              <strong>{selectedProducts.length} selected</strong>
+              <span>{selectedActive} active · {selectedReview} need review</span>
+            </div>
+          </div>
+          <div className="bulk-action-groups">
+            <div className="bulk-group">
+              <span>Visibility</span>
+              <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('active')}><CheckCircle2 size={15} /> Active</button>
+              <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('hidden')}><EyeOff size={15} /> Hide</button>
+            </div>
+            <div className="bulk-group">
+              <span>Review</span>
+              <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('review')}><AlertTriangle size={15} /> Needs Review</button>
+              <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('clear-review')}><ShieldCheck size={15} /> Clear</button>
+            </div>
+            <div className="bulk-group">
+              <span>Promo</span>
+              <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('flash')}><Flame size={15} /> Flash Sale</button>
+            </div>
+            <div className="bulk-group danger-group">
+              <span>Danger</span>
+              <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => setSelectedIds(new Set())}><X size={15} /> Clear Selection</button>
+              <button className="danger" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('delete')}><Trash2 size={15} /> Delete</button>
+            </div>
           </div>
         </div>
 

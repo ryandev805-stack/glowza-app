@@ -636,6 +636,40 @@ button.review-summary {
   padding: 10px;
 }
 
+.pro-bulk-bar {
+  align-items: stretch;
+  background:
+    linear-gradient(135deg, rgba(143, 15, 79, 0.08), rgba(255, 79, 163, 0.06)),
+    var(--surface);
+  box-shadow: 0 18px 44px rgba(143, 15, 79, 0.08);
+}
+
+.bulk-selection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 230px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 10px 12px;
+}
+
+.bulk-selection > div {
+  display: grid;
+  gap: 2px;
+}
+
+.bulk-selection strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.bulk-selection span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .bulk-bar > span {
   color: var(--muted);
   font-size: 12px;
@@ -648,6 +682,46 @@ button.review-summary {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.bulk-action-groups {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.bulk-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(143, 15, 79, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 8px;
+}
+
+.bulk-group > span {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bulk-group button {
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+.bulk-group button svg {
+  flex: 0 0 auto;
+}
+
+.danger-group {
+  border-color: rgba(224, 62, 88, 0.16);
 }
 
 .select-box {
@@ -1386,6 +1460,7 @@ button.review-summary {
   .hero-actions,
   .toolbar-controls,
   .bulk-actions,
+  .bulk-action-groups,
   .order-quick-actions,
   .order-contact-actions {
     width: 100%;
@@ -1410,6 +1485,24 @@ button.review-summary {
   .bulk-bar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .bulk-selection {
+    width: 100%;
+  }
+
+  .bulk-action-groups,
+  .bulk-group {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bulk-group {
+    width: 100%;
+  }
+
+  .bulk-group button {
+    justify-content: center;
   }
 
   .select-box {
