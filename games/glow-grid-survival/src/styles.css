@@ -1,0 +1,35 @@
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #2c1022;
+  touch-action: none;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+canvas {
+  display: block;
+  image-rendering: auto;
+}
+
+.loading-shell {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  background:
+    radial-gradient(circle at top right, rgba(255, 79, 163, 0.35), transparent 35%),
+    linear-gradient(180deg, #4a0b28, #2c1022);
+  color: white;
+}
+
+.loading-shell strong {
+  font-size: 24px;
+}

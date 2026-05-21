@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Clipboard, PackageCheck, Phone, RefreshCcw, Truck } from 'lucide-react';
 import { listOrders, updateOrderStatus } from '../services/firestoreService';
 import type { Order } from '../types';
 import { useCollection } from '../hooks/useCollection';
@@ -34,6 +35,10 @@ export function OrdersPage({
   });
   const pending = items.filter((order) => order.status === 'pending').length;
   const revenue = items.reduce((total, order) => total + Number(order.total || 0), 0);
+  const statusCounts = statuses.reduce<Record<string, number>>((counts, status) => {
+    counts[status] = items.filter((order) => order.status === status).length;
+    return counts;
+  }, {});
 
   useEffect(() => {
     if (orderId && !loading && !selected) {
@@ -46,15 +51,24 @@ export function OrdersPage({
     await refresh();
   }
 
+  async function copyOrder(order: Order) {
+    const products = (order.products || [])
+      .map((product) => `- ${product.name} x ${product.quantity} = ${money(product.price * product.quantity)}`)
+      .join('\n');
+    await navigator.clipboard?.writeText(
+      `${order.orderNumber}\n${order.customerName}\n${order.customerPhone}\n${order.address}, ${order.city}\n\n${products}\n\nTotal: ${money(order.total)}`,
+    );
+  }
+
   return (
     <section className="orders-page">
       <div className="page-hero compact-hero">
         <div>
           <span className="eyebrow">Orders</span>
           <h1>{selected ? selected.orderNumber : 'Order Queue'}</h1>
-          <p>Track COD orders, customer delivery details, products, and fulfillment status.</p>
+          <p>Track orders, customer delivery details, products, and fulfillment status.</p>
         </div>
-        {selected ? <button className="ghost" onClick={onBack}>Back to Orders</button> : <button onClick={refresh}>Refresh</button>}
+        {selected ? <button className="ghost" onClick={onBack}>Back to Orders</button> : <button onClick={refresh}><RefreshCcw size={17} /> Refresh</button>}
       </div>
 
       <div className="metric-grid">
@@ -79,6 +93,14 @@ export function OrdersPage({
               </select>
             </div>
           </div>
+          <div className="status-filter-row">
+            <button className={statusFilter === 'all' ? 'active' : ''} onClick={() => setStatusFilter('all')}>All <span>{items.length}</span></button>
+            {statuses.map((status) => (
+              <button key={status} className={statusFilter === status ? 'active' : ''} onClick={() => setStatusFilter(status)}>
+                {status} <span>{statusCounts[status] || 0}</span>
+              </button>
+            ))}
+          </div>
 
           {loading && <p>Loading orders...</p>}
           {error && <p className="error">{error}</p>}
@@ -94,13 +116,15 @@ export function OrdersPage({
                     <span>{money(order.total)}</span>
                     <span>{order.totalItems} items</span>
                     <span>{order.city}</span>
+                    <span>{order.paymentStatus}</span>
                   </div>
                 </div>
                 <div className="row-actions">
                   <select value={order.status} onChange={(event) => void setStatus(order.id, event.target.value)}>
                     {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
                   </select>
-                  <button onClick={() => onView(order.id)}>Detail</button>
+                  <button className="ghost" onClick={() => void copyOrder(order)}><Clipboard size={15} /> Copy</button>
+                  <button onClick={() => onView(order.id)}>Manage</button>
                 </div>
               </article>
             ))}
@@ -120,6 +144,13 @@ export function OrdersPage({
               </select>
             </div>
 
+            <div className="order-quick-actions">
+              <button className="ghost" onClick={() => void setStatus(selected.id, 'confirmed')}><CheckCircle2 size={16} /> Confirm</button>
+              <button className="ghost" onClick={() => void setStatus(selected.id, 'processing')}><PackageCheck size={16} /> Process</button>
+              <button className="ghost" onClick={() => void setStatus(selected.id, 'shipped')}><Truck size={16} /> Ship</button>
+              <button onClick={() => void setStatus(selected.id, 'delivered')}><CheckCircle2 size={16} /> Delivered</button>
+            </div>
+
             <div className="detail-grid">
               <div><span>Customer</span><strong>{selected.customerName}</strong></div>
               <div><span>Phone</span><strong>{selected.customerPhone}</strong></div>
@@ -132,6 +163,10 @@ export function OrdersPage({
             <section className="detail-block">
               <h3>Delivery Address</h3>
               <p>{selected.address}</p>
+              <div className="row-actions order-contact-actions">
+                <a className="ghost-link" href={`tel:${selected.customerPhone}`}><Phone size={15} /> Call</a>
+                <button className="ghost" onClick={() => void copyOrder(selected)}><Clipboard size={15} /> Copy Order</button>
+              </div>
             </section>
 
             <section className="detail-block">

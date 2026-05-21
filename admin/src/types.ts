@@ -30,6 +30,7 @@ export type Product = {
   categoryId: string;
   image: string;
   images?: string[];
+  videos?: string[];
   stock: number;
   isActive: boolean;
   brand?: string;
@@ -44,9 +45,47 @@ export type Product = {
   isNew?: boolean;
   isBestSeller?: boolean;
   isFlashSale?: boolean;
+  source?: string;
+  sourceUrl?: string;
+  markazPrice?: number;
+  markupPercent?: number;
+  cutPriceMarkupPercent?: number;
+  winningScore?: number;
+  importStatus?: 'draft' | 'imported' | 'rejected';
+  needsReview?: boolean;
+  markazStatus?: string;
+  markazVariationId?: string;
+  markazVariationName?: string;
+  sourceSyncedAt?: FirestoreDate;
+  sourceImages?: string[];
+  sourceVideos?: string[];
+  syncChangeSummary?: string[];
+  syncChangeCount?: number;
   reviews?: ProductReview[];
   createdAt?: FirestoreDate;
   updatedAt?: FirestoreDate;
+};
+
+export type WinningProductCandidate = {
+  id: string;
+  name: string;
+  description: string;
+  sourceUrl: string;
+  markazPrice: number;
+  price: number;
+  oldPrice: number;
+  discount: number;
+  image: string;
+  images: string[];
+  videos: string[];
+  markazVariationId?: string;
+  markazVariationName?: string;
+  brand: string;
+  stock: number;
+  markazStatus?: string;
+  winningScore: number;
+  reasons: string[];
+  duplicate: boolean;
 };
 
 export type ProductReview = {
@@ -94,6 +133,10 @@ export type User = {
   name: string;
   phone: string;
   role: string;
+  isBlocked?: boolean;
+  defaultAddress?: string;
+  city?: string;
+  area?: string;
   createdAt?: FirestoreDate;
   updatedAt?: FirestoreDate;
 };

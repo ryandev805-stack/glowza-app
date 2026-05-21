@@ -4,13 +4,19 @@ function textBetween(source, pattern) {
 }
 
 function cleanText(value) {
-  return value
+  return String(value || '')
     .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/<[^>]*>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function formatDescription(value) {
+  return cleanText(value)
+    .replace(/\s*\\+\s*/g, '<br>')
+    .replace(/(<br>\s*){3,}/g, '<br><br>');
 }
 
 function parseJsonLd(html) {
@@ -46,6 +52,28 @@ function firstImage(value) {
 function numberFrom(value) {
   const match = String(value || '').replace(/,/g, '').match(/\d+(\.\d+)?/);
   return match ? Number(match[0]) : 0;
+}
+
+function buildPricing(markazPrice) {
+  const basePrice = Number(markazPrice) || 0;
+  let margin = 0;
+  if (basePrice <= 500) {
+    margin = 200;
+  } else if (basePrice <= 1000) {
+    margin = 300;
+  } else if (basePrice <= 1500) {
+    margin = 500;
+  } else if (basePrice <= 2500) {
+    margin = 750;
+  } else if (basePrice <= 3500) {
+    margin = 1000;
+  } else {
+    margin = basePrice * 0.5;
+  }
+  const price = Math.ceil(basePrice + margin);
+  const oldPrice = Math.ceil(price / 0.6);
+  const discount = oldPrice > price ? Math.round(((oldPrice - price) / oldPrice) * 100) : 0;
+  return { price, oldPrice, discount };
 }
 
 export default async function handler(req, res) {
@@ -96,19 +124,22 @@ export default async function handler(req, res) {
       numberFrom(offers?.price) ||
       numberFrom(textBetween(html, /<meta[^>]+property=["']product:price:amount["'][^>]+content=["']([^"']+)["'][^>]*>/i)) ||
       numberFrom(html.match(/(?:Rs\.?|PKR)\s*([0-9,.]+)/i)?.[1]);
+    const pricing = buildPricing(price);
     const brand = typeof jsonLd?.brand === 'object' ? jsonLd.brand.name : jsonLd?.brand;
 
     res.status(200).json({
       name: cleanText(title),
-      description: cleanText(description),
-      price,
-      oldPrice: price,
+      description: formatDescription(description),
+      price: pricing.price,
+      oldPrice: pricing.oldPrice,
+      discount: pricing.discount,
       image,
       images,
       brand: cleanText(brand || 'Markaz'),
       stock: 10,
       isActive: true,
       sourceUrl: url,
+      markazPrice: price,
     });
   } catch (error) {
     res.status(500).json({

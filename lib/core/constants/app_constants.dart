@@ -7,4 +7,13 @@ class AppConstants {
   static const deepPlum = 0xFF3A1028;
   static const roseWine = 0xFF8E174A;
   static const deliveryCharges = 250;
+  static const gamePointsPerRupee = 10;
+  static const gameEstimatedRewardedAdRevenuePkr = 10.0;
+  static const gameUserRewardShare = 0.20;
+  static const gameRewardMinimumSessionSeconds = 300;
+  static const gameRewardSecondsPerCreditedAd = 300;
+  static const gameRewardDailyPointCap = 2500;
+  static const gameRewardMaxDiscount = 150;
+  static const gameRewardMinimumOrder = 1999;
+  static const gameRewardMaxOrderPercent = 0.10;
 }

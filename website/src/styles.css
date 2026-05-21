@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Gopher';
+  src: url('/fonts/GopherDisplay-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gopher';
+  src: url('/fonts/GopherDisplay-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gopher';
+  src: url('/fonts/GopherDisplay-Bold.woff2') format('woff2');
+  font-weight: 700 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gopher';
+  src: url('/fonts/GopherDisplay-Black.woff2') format('woff2');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #fff7fa;
+  color: #2c1022;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  font-family: 'Gopher', ui-sans-serif, system-ui, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(18px);
+}
+
+.focus-ring {
+  @apply focus:outline-none focus:ring-4 focus:ring-glowza-hot/20;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.product-rich-text h2,
+.product-rich-text h3 {
+  margin: 0 0 0.55rem;
+  color: #3f1230;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.product-rich-text p {
+  margin: 0 0 0.7rem;
+}
+
+.product-rich-text ul,
+.product-rich-text ol {
+  margin: 0.45rem 0 0.75rem;
+  padding-left: 1.25rem;
+}
+
+.product-rich-text li {
+  margin: 0.25rem 0;
+}
+
+.product-rich-text a {
+  color: #ff4fa3;
+  font-weight: 800;
+  text-decoration: underline;
+}

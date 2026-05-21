@@ -1,36 +1,213 @@
-import { useCallback } from 'react';
-import { listUsers } from '../services/firestoreService';
-import type { User } from '../types';
+import { useCallback, useMemo, useState } from 'react';
+import { BadgeCheck, Ban, RefreshCcw, Save, Search, ShoppingBag, UserRound } from 'lucide-react';
+import { listOrders, listUsers, updateUserProfile } from '../services/firestoreService';
+import type { Order, User } from '../types';
 import { useCollection } from '../hooks/useCollection';
 
+function money(value: number | undefined) {
+  return `PKR ${Number(value || 0).toLocaleString('en-PK')}`;
+}
+
+function formatDate(value: User['createdAt']) {
+  if (!value) return 'Not available';
+  if ('toDate' in value) return value.toDate().toLocaleDateString();
+  return new Date(value).toLocaleDateString();
+}
+
 export function UsersPage() {
-  const loader = useCallback(() => listUsers(), []);
-  const { items, loading, error, refresh } = useCollection<User>(loader);
+  const users = useCollection<User>(useCallback(() => listUsers(), []));
+  const orders = useCollection<Order>(useCallback(() => listOrders(), []));
+  const [query, setQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [selectedId, setSelectedId] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const selected = users.items.find((user) => user.id === selectedId) || users.items[0] || null;
+  const selectedOrders = useMemo(
+    () => selected ? orders.items.filter((order) => order.userId === selected.id) : [],
+    [orders.items, selected],
+  );
+  const statsByUser = useMemo(() => {
+    const map = new Map<string, { orders: number; spend: number; lastOrder?: string }>();
+    orders.items.forEach((order) => {
+      const current = map.get(order.userId) || { orders: 0, spend: 0 };
+      current.orders += 1;
+      current.spend += Number(order.total || 0);
+      current.lastOrder = order.orderNumber;
+      map.set(order.userId, current);
+    });
+    return map;
+  }, [orders.items]);
+
+  const filtered = users.items.filter((user) => {
+    const text = `${user.name || ''} ${user.phone || ''} ${user.role || ''}`.toLowerCase();
+    const roleMatches = roleFilter === 'all' || user.role === roleFilter || (roleFilter === 'blocked' && user.isBlocked);
+    return roleMatches && text.includes(query.toLowerCase());
+  });
+  const customers = users.items.filter((user) => user.role !== 'admin').length;
+  const blocked = users.items.filter((user) => user.isBlocked).length;
+  const repeatCustomers = users.items.filter((user) => (statsByUser.get(user.id)?.orders || 0) > 1).length;
+
+  async function saveUser(input: Partial<Pick<User, 'name' | 'role' | 'isBlocked'>>) {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      await updateUserProfile(selected.id, input);
+      await users.refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <section className="panel">
-      <div className="panel-head">
+    <section className="users-page admin-layout">
+      <div className="page-hero compact-hero">
         <div>
           <span className="eyebrow">Customers</span>
-          <h2>Users</h2>
-          <p>{items.length} registered phone profiles</p>
+          <h1>User Management</h1>
+          <p>Inspect customer profiles, role state, order value, and delivery history from Firestore.</p>
         </div>
-        <button onClick={refresh}>Refresh</button>
+        <button onClick={() => { void users.refresh(); void orders.refresh(); }}><RefreshCcw size={17} /> Refresh</button>
       </div>
-      {loading && <p>Loading...</p>}
-      {error && <p className="error">{error}</p>}
-      <div className="user-grid">
-        {items.map((user) => (
-          <article className="user-card" key={user.id}>
-            <div className="avatar">{user.name?.slice(0, 1) || 'U'}</div>
-            <div>
-              <strong>{user.name || 'Unnamed user'}</strong>
-              <span>{user.phone}</span>
-              <small>{user.role}</small>
+
+      <div className="metric-grid">
+        <Metric title="Users" value={users.items.length} detail={`${customers} customers`} />
+        <Metric title="Repeat" value={repeatCustomers} detail="more than one order" />
+        <Metric title="Blocked" value={blocked} detail="restricted profiles" />
+        <Metric title="Orders" value={orders.items.length} detail="all customer orders" />
+      </div>
+
+      <div className="management-grid">
+      <section className="panel">
+        <div className="toolbar">
+          <div>
+            <h2>Customer Directory</h2>
+            <p>{filtered.length} matching profiles</p>
+          </div>
+          <div className="toolbar-controls">
+            <label className="search-field">
+              <Search size={17} />
+              <input placeholder="Search name, phone, role" value={query} onChange={(event) => setQuery(event.target.value)} />
+            </label>
+            <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
+              <option value="all">All users</option>
+              <option value="customer">Customers</option>
+              <option value="admin">Admins</option>
+              <option value="blocked">Blocked</option>
+            </select>
+          </div>
+        </div>
+
+        {users.loading && <p>Loading users...</p>}
+        {users.error && <p className="error">{users.error}</p>}
+
+        <div className="user-grid">
+          {filtered.map((user) => {
+            const stats = statsByUser.get(user.id) || { orders: 0, spend: 0 };
+            return (
+              <button
+                key={user.id}
+                className={`user-card clickable ${selected?.id === user.id ? 'selected' : ''}`}
+                onClick={() => setSelectedId(user.id)}
+              >
+                <div className="avatar">{user.name?.slice(0, 1).toUpperCase() || <UserRound size={22} />}</div>
+                <div>
+                  <strong>{user.name || 'Unnamed user'}</strong>
+                  <span>{user.phone || 'No phone'}</span>
+                  <div className="mini-pills">
+                    <span>{user.isBlocked ? 'Blocked' : user.role || 'customer'}</span>
+                    <span>{stats.orders} orders</span>
+                    <span>{money(stats.spend)}</span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+          {filtered.length === 0 && <p className="muted">No users match this filter.</p>}
+        </div>
+      </section>
+
+      <aside className="panel detail-panel">
+        {selected ? (
+          <>
+            <div className="panel-head">
+              <div>
+                <span className="eyebrow">Profile Detail</span>
+                <h2>{selected.name || 'Unnamed user'}</h2>
+                <p>{selected.phone}</p>
+              </div>
+              <span className={`pill ${selected.isBlocked ? 'danger-pill' : 'success-pill'}`}>
+                {selected.isBlocked ? 'Blocked' : 'Active'}
+              </span>
             </div>
-          </article>
-        ))}
+
+            <div className="detail-grid">
+              <div><span>Role</span><strong>{selected.role || 'customer'}</strong></div>
+              <div><span>Joined</span><strong>{formatDate(selected.createdAt)}</strong></div>
+              <div><span>Orders</span><strong>{selectedOrders.length}</strong></div>
+              <div><span>Total Spend</span><strong>{money(selectedOrders.reduce((total, order) => total + Number(order.total || 0), 0))}</strong></div>
+            </div>
+
+            <section className="editor-section">
+              <div className="section-title">
+                <span><BadgeCheck size={16} /></span>
+                <div>
+                  <h3>Profile Controls</h3>
+                  <p>These fields update the Firestore user document.</p>
+                </div>
+              </div>
+              <label>Name<input defaultValue={selected.name || ''} onBlur={(event) => {
+                if (event.target.value !== selected.name) void saveUser({ name: event.target.value });
+              }} /></label>
+              <label>
+                Role
+                <select value={selected.role || 'customer'} onChange={(event) => void saveUser({ role: event.target.value })}>
+                  <option value="customer">customer</option>
+                  <option value="admin">admin</option>
+                  <option value="support">support</option>
+                </select>
+              </label>
+              <button className={selected.isBlocked ? '' : 'danger'} disabled={saving} onClick={() => void saveUser({ isBlocked: !selected.isBlocked })}>
+                {selected.isBlocked ? <Save size={17} /> : <Ban size={17} />}
+                {selected.isBlocked ? 'Unblock User' : 'Block User'}
+              </button>
+            </section>
+
+            <section className="detail-block">
+              <h3>Recent Orders</h3>
+              <div className="data-list">
+                {selectedOrders.slice(0, 6).map((order) => (
+                  <article className="simple-row" key={order.id}>
+                    <div>
+                      <strong>{order.orderNumber}</strong>
+                      <span>{order.status} - {order.city}</span>
+                    </div>
+                    <strong>{money(order.total)}</strong>
+                  </article>
+                ))}
+                {selectedOrders.length === 0 && <p className="muted">This user has not placed orders yet.</p>}
+              </div>
+            </section>
+          </>
+        ) : (
+          <div className="empty-state">
+            <ShoppingBag size={34} />
+            <h2>No user selected</h2>
+            <p>Select a customer from the directory to manage their profile.</p>
+          </div>
+        )}
+      </aside>
       </div>
     </section>
+  );
+}
+
+function Metric({ title, value, detail }: { title: string; value: number | string; detail: string }) {
+  return (
+    <article className="metric-card">
+      <span>{title}</span>
+      <strong>{value}</strong>
+      <p>{detail}</p>
+    </article>
   );
 }

@@ -40,6 +40,11 @@ dependencies:
   cloud_firestore: ^6.4.1
   firebase_messaging: ^16.0.4
   http: ^1.2.2
+  google_mobile_ads: ^5.2.0
+  logger:
+    path: D:/Games/WordlyPlus/packages/logger
+  wordly:
+    path: D:/Games/WordlyPlus
 
 dev_dependencies:
   flutter_test:
@@ -52,13 +57,26 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
 
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: app_icon.png
+  image_path: app-icon-dot.png
+  adaptive_icon_background: "#8F0F4F"
+  adaptive_icon_foreground: app-icon-dot.png
   min_sdk_android: 21
-  remove_alpha_ios: true
+  remove_alpha_ios: false
+
+flutter_native_splash:
+  color: "#8F0F4F"
+  image: white-icon-logo.png
+  android: true
+  ios: true
+  web: false
+  android_12:
+    color: "#8F0F4F"
+    image: white-icon-logo.png
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -97,6 +115,9 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - app_icon.png
+    - app-icon-dot.png
+    - white-icon-logo.png
+    - assets/dictionary/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

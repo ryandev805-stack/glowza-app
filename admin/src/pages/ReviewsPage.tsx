@@ -1,52 +1,68 @@
 import { useCallback, useMemo, useState } from 'react';
-import { deleteReview, listProducts, listReviews, updateReviewStatus } from '../services/firestoreService';
-import type { Product, Review } from '../types';
+import { CheckCircle2, EyeOff, RefreshCcw, Search, Star, Trash2 } from 'lucide-react';
+import { deleteReview, listOrders, listProducts, listReviews, listUsers, updateReviewStatus } from '../services/firestoreService';
+import type { Order, Product, Review, User } from '../types';
 import { useCollection } from '../hooks/useCollection';
+
+const reviewStatuses = ['pending', 'approved', 'hidden', 'all'] as const;
 
 export function ReviewsPage() {
   const reviews = useCollection<Review>(useCallback(() => listReviews(), []));
   const products = useCollection<Product>(useCallback(() => listProducts(), []));
-  const [status, setStatus] = useState('pending');
+  const orders = useCollection<Order>(useCallback(() => listOrders(), []));
+  const users = useCollection<User>(useCallback(() => listUsers(), []));
+  const [status, setStatus] = useState<(typeof reviewStatuses)[number]>('all');
   const [query, setQuery] = useState('');
+  const [selectedId, setSelectedId] = useState('');
 
-  const productById = useMemo(
-    () => new Map(products.items.map((product) => [product.id, product])),
-    [products.items],
-  );
+  const productById = useMemo(() => new Map(products.items.map((product) => [product.id, product])), [products.items]);
+  const orderById = useMemo(() => new Map(orders.items.map((order) => [order.id, order])), [orders.items]);
+  const userById = useMemo(() => new Map(users.items.map((user) => [user.id, user])), [users.items]);
+
   const filtered = reviews.items.filter((review) => {
     const product = productById.get(review.productId);
-    const text = `${review.customerName} ${review.comment} ${product?.name || ''}`.toLowerCase();
+    const order = orderById.get(review.orderId);
+    const user = userById.get(review.userId);
+    const text = `${review.customerName} ${review.comment} ${product?.name || ''} ${order?.orderNumber || ''} ${user?.phone || ''}`.toLowerCase();
     const statusMatches = status === 'all' || review.status === status;
     return statusMatches && text.includes(query.toLowerCase());
   });
+  const selected = reviews.items.find((review) => review.id === selectedId) || filtered[0] || null;
+  const selectedProduct = selected ? productById.get(selected.productId) : null;
+  const selectedOrder = selected ? orderById.get(selected.orderId) : null;
+  const selectedUser = selected ? userById.get(selected.userId) : null;
+
   const counts = {
     pending: reviews.items.filter((review) => review.status === 'pending').length,
     approved: reviews.items.filter((review) => review.status === 'approved').length,
     hidden: reviews.items.filter((review) => review.status === 'hidden').length,
   };
 
+  async function refreshAll() {
+    await Promise.all([reviews.refresh(), products.refresh(), orders.refresh(), users.refresh()]);
+  }
+
   async function changeStatus(review: Review, nextStatus: Review['status']) {
     await updateReviewStatus(review, nextStatus);
-    await reviews.refresh();
-    await products.refresh();
+    await refreshAll();
   }
 
   async function remove(review: Review) {
-    if (!confirm('Delete this review?')) return;
+    if (!confirm('Delete this review permanently?')) return;
     await deleteReview(review);
-    await reviews.refresh();
-    await products.refresh();
+    setSelectedId('');
+    await refreshAll();
   }
 
   return (
-    <section className="reviews-page">
+    <section className="reviews-page admin-layout">
       <div className="page-hero compact-hero">
         <div>
           <span className="eyebrow">Reviews</span>
           <h1>Review Moderation</h1>
-          <p>Approve delivered-order reviews before they become public in the mobile app.</p>
+          <p>Moderate delivered-order reviews, inspect context, and sync approved reviews to product ratings.</p>
         </div>
-        <button onClick={reviews.refresh}>Refresh</button>
+        <button onClick={() => void refreshAll()}><RefreshCcw size={17} /> Refresh</button>
       </div>
 
       <div className="metric-grid">
@@ -56,19 +72,23 @@ export function ReviewsPage() {
         <Metric title="Total" value={reviews.items.length} detail="all reviews" />
       </div>
 
+      <div className="management-grid">
       <section className="panel">
         <div className="toolbar">
           <div>
-            <h2>Review Queue</h2>
-            <p>{filtered.length} results</p>
+            <h2>All Reviews</h2>
+            <p>{filtered.length} of {reviews.items.length} reviews</p>
           </div>
           <div className="toolbar-controls">
-            <input placeholder="Search customer, product, comment" value={query} onChange={(event) => setQuery(event.target.value)} />
-            <select value={status} onChange={(event) => setStatus(event.target.value)}>
+            <label className="search-field">
+              <Search size={17} />
+              <input placeholder="Search review, product, order, phone" value={query} onChange={(event) => setQuery(event.target.value)} />
+            </label>
+            <select value={status} onChange={(event) => setStatus(event.target.value as (typeof reviewStatuses)[number])}>
+              <option value="all">All reviews</option>
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="hidden">Hidden</option>
-              <option value="all">All reviews</option>
             </select>
           </div>
         </div>
@@ -80,30 +100,84 @@ export function ReviewsPage() {
           {filtered.map((review) => {
             const product = productById.get(review.productId);
             return (
-              <article className="review-card moderation-card" key={review.id}>
-                <div className="review-top">
-                  <div>
-                    <strong>{review.customerName || 'Glowza customer'}</strong>
-                    <span>{product?.name || 'Unknown product'} - {review.rating}/5</span>
+              <button
+                className={`review-summary clickable ${selected?.id === review.id ? 'selected' : ''}`}
+                key={review.id}
+                onClick={() => setSelectedId(review.id)}
+              >
+                {product?.image ? <img src={product.image} alt="" /> : <div className="empty-thumb"><Star size={20} /></div>}
+                <div>
+                  <strong>{product?.name || 'Unknown product'}</strong>
+                  <span>{review.customerName || 'Glowza customer'} - {review.rating}/5</span>
+                  <p>{review.comment}</p>
+                  <div className="mini-pills">
+                    <span>{review.status}</span>
+                    <span>Order {review.orderId?.slice(0, 8)}</span>
                   </div>
-                  <span className="pill">{review.status}</span>
                 </div>
-                <p>{review.comment}</p>
-                <div className="mini-pills">
-                  <span>Order {review.orderId.slice(0, 8)}</span>
-                  <span>User {review.userId.slice(0, 8)}</span>
-                </div>
-                <div className="row-actions">
-                  <button disabled={review.status === 'approved'} onClick={() => void changeStatus(review, 'approved')}>Approve</button>
-                  <button className="ghost" disabled={review.status === 'hidden'} onClick={() => void changeStatus(review, 'hidden')}>Hide</button>
-                  <button className="danger" onClick={() => void remove(review)}>Delete</button>
-                </div>
-              </article>
+              </button>
             );
           })}
           {filtered.length === 0 && <p className="muted">No reviews match this filter.</p>}
         </div>
       </section>
+
+      <aside className="panel detail-panel">
+        {selected ? (
+          <>
+            <div className="panel-head">
+              <div>
+                <span className="eyebrow">Review Detail</span>
+                <h2>{selected.customerName || selectedUser?.name || 'Glowza customer'}</h2>
+                <p>{selected.status} - {selected.rating}/5 rating</p>
+              </div>
+              <span className={`pill status-pill-${selected.status}`}>{selected.status}</span>
+            </div>
+
+            <div className="review-rating">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star key={star} size={28} fill={selected.rating >= star ? 'currentColor' : 'none'} />
+              ))}
+            </div>
+
+            <blockquote className="review-quote">{selected.comment}</blockquote>
+
+            <div className="detail-grid">
+              <div><span>Product</span><strong>{selectedProduct?.name || 'Missing product'}</strong></div>
+              <div><span>Customer Phone</span><strong>{selectedUser?.phone || selectedOrder?.customerPhone || 'Unknown'}</strong></div>
+              <div><span>Order</span><strong>{selectedOrder?.orderNumber || selected.orderId}</strong></div>
+              <div><span>Order Status</span><strong>{selectedOrder?.status || 'Unknown'}</strong></div>
+            </div>
+
+            {selectedProduct && (
+              <article className="data-card">
+                {selectedProduct.image ? <img src={selectedProduct.image} alt="" /> : <div className="empty-thumb">P</div>}
+                <div className="data-main">
+                  <strong>{selectedProduct.name}</strong>
+                  <span>{selectedProduct.brand || 'Glowza'} - PKR {Number(selectedProduct.price || 0).toLocaleString('en-PK')}</span>
+                  <div className="mini-pills">
+                    <span>{selectedProduct.reviewCount || 0} public reviews</span>
+                    <span>{Number(selectedProduct.rating || 0).toFixed(1)} rating</span>
+                  </div>
+                </div>
+              </article>
+            )}
+
+            <div className="row-actions stacked-actions">
+              <button disabled={selected.status === 'approved'} onClick={() => void changeStatus(selected, 'approved')}><CheckCircle2 size={17} /> Approve</button>
+              <button className="ghost" disabled={selected.status === 'hidden'} onClick={() => void changeStatus(selected, 'hidden')}><EyeOff size={17} /> Hide</button>
+              <button className="danger" onClick={() => void remove(selected)}><Trash2 size={17} /> Delete Review</button>
+            </div>
+          </>
+        ) : (
+          <div className="empty-state">
+            <Star size={34} />
+            <h2>No review selected</h2>
+            <p>Select a review from the queue to moderate it.</p>
+          </div>
+        )}
+      </aside>
+      </div>
     </section>
   );
 }

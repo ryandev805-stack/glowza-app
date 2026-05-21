@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
+import { PlayCircle, RefreshCcw } from 'lucide-react';
 import { ImageField } from '../components/ImageField';
-import { importImageUrlToCloudinary, uploadToCloudinary } from '../services/cloudinaryService';
-import { deleteProduct, listCategories, listProducts, saveProduct } from '../services/firestoreService';
+import { RichTextEditor } from '../components/RichTextEditor';
+import { importImageUrlToCloudinary, importMediaUrlToCloudinary, uploadToCloudinary } from '../services/cloudinaryService';
+import { bulkDeleteProducts, bulkUpdateProducts, deleteProduct, listCategories, listProducts, saveProduct } from '../services/firestoreService';
+import { syncMarkazProduct } from '../services/markazSyncService';
 import { scrapeProduct } from '../services/scraperService';
 import type { Category, Product } from '../types';
 import { useCollection } from '../hooks/useCollection';
@@ -14,6 +17,7 @@ const emptyProduct: Omit<Product, 'id'> = {
   categoryId: '',
   image: '',
   images: [],
+  videos: [],
   stock: 10,
   isActive: true,
   brand: '',
@@ -28,6 +32,12 @@ const emptyProduct: Omit<Product, 'id'> = {
   isNew: false,
   isBestSeller: false,
   isFlashSale: false,
+  source: '',
+  sourceUrl: '',
+  markazPrice: 0,
+  markupPercent: 70,
+  cutPriceMarkupPercent: 40,
+  needsReview: false,
   reviews: [],
 };
 
@@ -52,6 +62,11 @@ export function ProductsPage({
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
+  const [syncingId, setSyncingId] = useState('');
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [syncProgress, setSyncProgress] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const pageSize = 10;
 
   const categoryById = useMemo(
@@ -71,10 +86,124 @@ export function ProductsPage({
   const pagedProducts = filteredProducts.slice((page - 1) * pageSize, page * pageSize);
   const lowStock = products.items.filter((product) => Number(product.stock || 0) <= 5).length;
   const active = products.items.filter((product) => product.isActive).length;
+  const markazProducts = products.items.filter((product) => Boolean(product.sourceUrl));
+  const selectedProducts = products.items.filter((product) => selectedIds.has(product.id));
 
   useEffect(() => {
     setPage(1);
   }, [query, status]);
+
+  useEffect(() => {
+    setSelectedIds((current) => new Set([...current].filter((id) => products.items.some((product) => product.id === id))));
+  }, [products.items]);
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function togglePageSelected() {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      const allSelected = pagedProducts.every((product) => next.has(product.id));
+      pagedProducts.forEach((product) => {
+        if (allSelected) {
+          next.delete(product.id);
+        } else {
+          next.add(product.id);
+        }
+      });
+      return next;
+    });
+  }
+
+  async function runBulk(action: string) {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(true);
+    try {
+      const ids = [...selectedIds];
+      if (action === 'active') await bulkUpdateProducts(ids, { isActive: true, needsReview: false });
+      if (action === 'hidden') await bulkUpdateProducts(ids, { isActive: false });
+      if (action === 'review') await bulkUpdateProducts(ids, { isActive: false, needsReview: true });
+      if (action === 'clear-review') await bulkUpdateProducts(ids, { needsReview: false });
+      if (action === 'flash') await bulkUpdateProducts(ids, { isFlashSale: true });
+      if (action === 'delete') {
+        if (!confirm(`Delete ${ids.length} selected product${ids.length === 1 ? '' : 's'}?`)) return;
+        await bulkDeleteProducts(ids);
+      }
+      setSelectedIds(new Set());
+      await products.refresh();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function syncProduct(product: Product) {
+    setSyncingId(product.id);
+    try {
+      const result = await syncMarkazProduct(product.id);
+      await products.refresh();
+      if (result.changed) {
+        alert(`${product.name} was changed on Markaz and is now inactive for review:\n\n${(result.changeSummary || []).join('\n')}`);
+      } else {
+        alert(`${product.name} is already up to date.`);
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not sync product');
+    } finally {
+      setSyncingId('');
+    }
+  }
+
+  async function syncAllProducts() {
+    const linkedProducts = products.items.filter((product) => Boolean(product.sourceUrl));
+    if (linkedProducts.length === 0) {
+      alert('No products have Markaz source links saved.');
+      return;
+    }
+    const confirmed = confirm(`Sync ${linkedProducts.length} Markaz-linked product${linkedProducts.length === 1 ? '' : 's'} now?`);
+    if (!confirmed) return;
+
+    setSyncingAll(true);
+    setSyncProgress(`0/${linkedProducts.length} synced`);
+    let completed = 0;
+    let failed = 0;
+    let changedCount = 0;
+    let index = 0;
+
+    async function worker() {
+      while (index < linkedProducts.length) {
+        const product = linkedProducts[index];
+        index += 1;
+        setSyncingId(product.id);
+        try {
+          const result = await syncMarkazProduct(product.id);
+          if (result.changed) changedCount += 1;
+        } catch {
+          failed += 1;
+        } finally {
+          completed += 1;
+          setSyncProgress(`${completed}/${linkedProducts.length} synced, ${changedCount} changed${failed ? `, ${failed} failed` : ''}`);
+        }
+      }
+    }
+
+    try {
+      await Promise.all(Array.from({ length: Math.min(3, linkedProducts.length) }, worker));
+      await products.refresh();
+      alert(`Sync complete. ${changedCount} product${changedCount === 1 ? '' : 's'} changed and were marked inactive for review.${failed ? ` ${failed} failed.` : ''}`);
+    } finally {
+      setSyncingId('');
+      setSyncingAll(false);
+    }
+  }
 
   return (
     <section className="catalogue-page">
@@ -98,7 +227,7 @@ export function ProductsPage({
         <div className="toolbar">
           <div>
             <h2>Product Catalogue</h2>
-            <p>{filteredProducts.length} results</p>
+            <p>{filteredProducts.length} results · {selectedIds.size} selected</p>
           </div>
           <div className="toolbar-controls">
             <input placeholder="Search products, brands, categories" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -108,28 +237,66 @@ export function ProductsPage({
               <option value="hidden">Hidden</option>
               <option value="low-stock">Low stock</option>
             </select>
+            <button className="ghost" disabled={syncingAll || markazProducts.length === 0} onClick={() => void syncAllProducts()}>
+              <RefreshCcw size={17} />
+              {syncingAll ? syncProgress || 'Syncing...' : `Sync All (${markazProducts.length})`}
+            </button>
             <button className="ghost" onClick={products.refresh}>Refresh</button>
           </div>
         </div>
 
         {products.loading && <p>Loading products...</p>}
         {products.error && <p className="error">{products.error}</p>}
+        <div className="bulk-bar">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={pagedProducts.length > 0 && pagedProducts.every((product) => selectedIds.has(product.id))}
+              onChange={togglePageSelected}
+            />
+            Select page
+          </label>
+          <span>{selectedProducts.length} selected</span>
+          <div className="bulk-actions">
+            <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('active')}>Make Active</button>
+            <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('hidden')}>Hide</button>
+            <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('review')}>Needs Review</button>
+            <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('clear-review')}>Clear Review</button>
+            <button className="ghost" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('flash')}>Flash Sale</button>
+            <button className="danger" disabled={bulkBusy || selectedIds.size === 0} onClick={() => void runBulk('delete')}>Delete</button>
+          </div>
+        </div>
 
         <div className="data-list">
           {pagedProducts.map((product) => (
             <article className="data-card product-card-admin" key={product.id}>
-              {product.image ? <img src={product.image} alt="" /> : <div className="empty-thumb">P</div>}
+              <label className="select-box" aria-label={`Select ${product.name}`}>
+                <input type="checkbox" checked={selectedIds.has(product.id)} onChange={() => toggleSelected(product.id)} />
+              </label>
+              <AdminProductMedia product={product} />
               <div className="data-main">
                 <strong>{product.name}</strong>
                 <span>{product.brand || 'Glowza'} - {categoryById.get(product.categoryId) || 'No category'}</span>
                 <div className="mini-pills">
                   <span>{money(product.price)}</span>
+                  {product.markazPrice ? <span>Markaz {money(product.markazPrice)}</span> : null}
                   <span>Stock {product.stock}</span>
                   <span>{product.isActive ? 'Active' : 'Hidden'}</span>
+                  {product.sourceUrl ? <span>Markaz Sync</span> : null}
+                  {product.needsReview ? <span>Needs review</span> : null}
                 </div>
+                {product.syncChangeSummary?.length ? <small>Changed: {product.syncChangeSummary.slice(0, 3).join(', ')}</small> : null}
               </div>
               <div className="row-actions">
                 <button onClick={() => onEdit(product.id)}>Edit</button>
+                {product.sourceUrl && (
+                  <>
+                    <a className="ghost-link" href={product.sourceUrl} target="_blank" rel="noreferrer">Source</a>
+                    <button className="ghost" disabled={syncingAll || syncingId === product.id} onClick={() => void syncProduct(product)}>
+                      {syncingId === product.id ? 'Syncing...' : 'Sync'}
+                    </button>
+                  </>
+                )}
                 <button
                   className="danger"
                   onClick={() => {
@@ -167,9 +334,12 @@ export function ProductEditorPage({
   const [form, setForm] = useState<Omit<Product, 'id'> & { id?: string }>(emptyProduct);
   const [saving, setSaving] = useState(false);
   const [galleryUrl, setGalleryUrl] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [galleryBusy, setGalleryBusy] = useState(false);
+  const [videoBusy, setVideoBusy] = useState(false);
   const [scrapeUrl, setScrapeUrl] = useState('');
   const [scraping, setScraping] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [scrapeError, setScrapeError] = useState('');
 
   const calculatedDiscount = useMemo(
@@ -185,6 +355,7 @@ export function ProductEditorPage({
         ...emptyProduct,
         ...product,
         images: product.images?.length ? product.images : product.image ? [product.image] : [],
+        videos: product.videos || [],
         reviews: product.reviews || [],
       });
     }
@@ -218,14 +389,39 @@ export function ProductEditorPage({
         oldPrice: Number(scraped.oldPrice || scraped.price || current.oldPrice || 0),
         image: cloudinaryImages[0] || current.image,
         images: cloudinaryImages.length ? cloudinaryImages : current.images,
+        videos: scraped.videos?.length ? scraped.videos : current.videos,
         stock: Number(scraped.stock || current.stock || 10),
         isActive: scraped.isActive ?? current.isActive,
         brand: scraped.brand || current.brand || 'Markaz',
+        source: 'markaz',
+        sourceUrl: scraped.sourceUrl || scrapeUrl,
       }));
     } catch (error) {
       setScrapeError(error instanceof Error ? error.message : 'Scrape failed');
     } finally {
       setScraping(false);
+    }
+  }
+
+  async function syncCurrentProduct() {
+    if (!productId) return;
+    setSyncing(true);
+    setScrapeError('');
+    try {
+      const result = await syncMarkazProduct(productId);
+      setForm((current) => ({
+        ...current,
+        ...result.product,
+        images: result.product.images?.length
+          ? result.product.images
+          : result.product.image
+            ? [result.product.image]
+            : current.images,
+      }));
+    } catch (error) {
+      setScrapeError(error instanceof Error ? error.message : 'Sync failed');
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -255,6 +451,32 @@ export function ProductEditorPage({
     }
   }
 
+  async function importVideoUrl() {
+    if (!videoUrl.trim()) return;
+    setVideoBusy(true);
+    try {
+      const uploaded = await importMediaUrlToCloudinary(videoUrl.trim());
+      addVideos([uploaded]);
+      setVideoUrl('');
+    } finally {
+      setVideoBusy(false);
+    }
+  }
+
+  async function uploadVideoFiles(files?: FileList | null) {
+    const selectedFiles = Array.from(files || []);
+    if (selectedFiles.length === 0) return;
+    setVideoBusy(true);
+    try {
+      const uploadedVideos = await Promise.all(
+        selectedFiles.map((file) => uploadToCloudinary(file)),
+      );
+      addVideos(uploadedVideos);
+    } finally {
+      setVideoBusy(false);
+    }
+  }
+
   function addGalleryImage(image: string) {
     addGalleryImages([image]);
   }
@@ -274,6 +496,20 @@ export function ProductEditorPage({
       const images = (current.images || []).filter((_, itemIndex) => itemIndex !== index);
       return { ...current, images, image: current.image === removed ? images[0] || '' : current.image };
     });
+  }
+
+  function addVideos(nextVideos: string[]) {
+    setForm((current) => ({
+      ...current,
+      videos: Array.from(new Set([...(current.videos || []), ...nextVideos.filter(Boolean)])),
+    }));
+  }
+
+  function removeVideo(index: number) {
+    setForm((current) => ({
+      ...current,
+      videos: (current.videos || []).filter((_, itemIndex) => itemIndex !== index),
+    }));
   }
 
   return (
@@ -304,8 +540,21 @@ export function ProductEditorPage({
             <button type="button" disabled={scraping || !scrapeUrl.trim()} onClick={fillFromUrl}>
               {scraping ? 'Filling...' : 'Fill Form'}
             </button>
+            {productId && form.sourceUrl && (
+              <button type="button" className="ghost" disabled={syncing} onClick={() => void syncCurrentProduct()}>
+                {syncing ? 'Syncing...' : 'Sync Markaz'}
+              </button>
+            )}
           </div>
           {scrapeError && <p className="error">{scrapeError}</p>}
+          <label>
+            Saved Markaz Product Link
+            <input
+              placeholder="https://www.markaz.app/shop/product/..."
+              value={form.sourceUrl || ''}
+              onChange={(event) => setForm({ ...form, source: event.target.value ? 'markaz' : '', sourceUrl: event.target.value })}
+            />
+          </label>
         </section>
 
         <section className="editor-section">
@@ -384,6 +633,30 @@ export function ProductEditorPage({
               </article>
             ))}
           </div>
+          <div className="inline-actions media-actions">
+            <input placeholder="Paste product video URL" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} />
+            <button type="button" disabled={videoBusy || !videoUrl.trim()} onClick={importVideoUrl}>
+              {videoBusy ? 'Importing...' : 'Import Video'}
+            </button>
+          </div>
+          <label>
+            Upload Product Videos
+            <input
+              type="file"
+              accept="video/*"
+              multiple
+              onChange={(event) => void uploadVideoFiles(event.target.files)}
+            />
+            {videoBusy && <small>Uploading product videos...</small>}
+          </label>
+          <div className="gallery-grid">
+            {(form.videos || []).map((video, index) => (
+              <article key={`${video}-${index}`} className="gallery-item video-item">
+                <video src={video} muted playsInline controls preload="metadata" />
+                <button type="button" className="danger" onClick={() => removeVideo(index)}>Remove</button>
+              </article>
+            ))}
+          </div>
         </section>
 
         <section className="editor-section">
@@ -394,7 +667,11 @@ export function ProductEditorPage({
               <p>Useful detail improves conversion in the mobile app.</p>
             </div>
           </div>
-          <label>Description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
+          <RichTextEditor
+            label="Description"
+            value={form.description}
+            onChange={(description) => setForm({ ...form, description })}
+          />
           <div className="two">
             <label>Ingredients<textarea value={form.ingredients || ''} onChange={(event) => setForm({ ...form, ingredients: event.target.value })} /></label>
             <label>How To Use<textarea value={form.howToUse || ''} onChange={(event) => setForm({ ...form, howToUse: event.target.value })} /></label>
@@ -411,7 +688,9 @@ export function ProductEditorPage({
       <aside className="editor-preview">
         <div className="panel preview-panel">
           <span className="eyebrow">Live Preview</span>
-          <div className="preview-image">{form.image ? <img src={form.image} alt="" /> : <span>No image</span>}</div>
+          <div className="preview-image">
+            {form.image ? <img src={form.image} alt="" /> : form.videos?.[0] ? <video src={form.videos[0]} muted playsInline controls preload="metadata" /> : <span>No media</span>}
+          </div>
           <h3>{form.name || 'Product name'}</h3>
           <p>{form.brand || 'Brand'} - {form.skinType || 'All skin types'}</p>
           <strong>{money(form.price)}</strong>
@@ -420,11 +699,36 @@ export function ProductEditorPage({
             <span>{form.isActive ? 'Active' : 'Hidden'}</span>
             <span>Stock {form.stock || 0}</span>
             <span>{form.images?.length || 0} images</span>
+            <span>{form.videos?.length || 0} videos</span>
+            {form.sourceUrl && <span>Markaz linked</span>}
           </div>
+          {form.sourceUrl && <a className="ghost-link" href={form.sourceUrl} target="_blank" rel="noreferrer">Open Markaz Source</a>}
         </div>
       </aside>
     </section>
   );
+}
+
+function AdminProductMedia({ product }: { product: Product }) {
+  const image = product.image || product.images?.[0] || '';
+  const video = !image ? product.videos?.[0] : '';
+  if (image) {
+    return (
+      <div className="admin-media-thumb">
+        <img src={image} alt="" />
+        {product.videos?.length ? <span><PlayCircle size={14} /></span> : null}
+      </div>
+    );
+  }
+  if (video) {
+    return (
+      <div className="admin-media-thumb">
+        <video src={video} muted playsInline preload="metadata" />
+        <span><PlayCircle size={14} /></span>
+      </div>
+    );
+  }
+  return <div className="empty-thumb">P</div>;
 }
 
 function Metric({ title, value, detail }: { title: string; value: number | string; detail: string }) {

@@ -20,6 +20,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   late final TextEditingController _area;
   late final TextEditingController _phone;
   bool _saveInfo = true;
+  bool _useGameDiscount = false;
 
   @override
   void initState() {
@@ -54,6 +55,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    final gameDiscount = _useGameDiscount ? state.gameDiscountValue : 0;
+    final payableTotal = state.grandTotal - gameDiscount;
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
       body: Form(
@@ -85,9 +88,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               title: const Text('Save this information for future orders'),
             ),
             const SizedBox(height: 12),
+            if (state.gamePoints > 0) ...[
+              _GameDiscountCard(
+                points: state.gamePoints,
+                discount: state.gameDiscountValue,
+                selected: _useGameDiscount && state.canUseGameDiscount,
+                enabled: state.canUseGameDiscount,
+                onChanged: (value) {
+                  setState(() => _useGameDiscount = value);
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
             _Total(label: 'Subtotal', value: state.subtotal),
             _Total(label: 'Delivery', value: state.deliveryCharges),
-            _Total(label: 'Grand Total', value: state.grandTotal, strong: true),
+            if (gameDiscount > 0)
+              _Total(label: 'Glow Points Discount', value: -gameDiscount),
+            _Total(label: 'Grand Total', value: payableTotal, strong: true),
             const SizedBox(height: 18),
             ElevatedButton(
               onPressed: state.cart.isEmpty
@@ -112,6 +129,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       try {
                         await context.read<AppState>().placeOrder(
                           checkoutInfo: info,
+                          gameDiscount: gameDiscount,
                         );
                       } catch (_) {
                         if (!context.mounted) {
@@ -185,6 +203,60 @@ class _PaymentCard extends StatelessWidget {
         title: Text('Cash on Delivery'),
         subtitle: Text('Pay in cash when your Glowza order arrives.'),
         trailing: Icon(Icons.check_circle, color: Colors.green),
+      ),
+    );
+  }
+}
+
+class _GameDiscountCard extends StatelessWidget {
+  const _GameDiscountCard({
+    required this.points,
+    required this.discount,
+    required this.selected,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final int points;
+  final int discount;
+  final bool selected;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFFFE4EF)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFC2185B).withValues(alpha: 0.07),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: CheckboxListTile(
+        value: selected,
+        onChanged: enabled ? (value) => onChanged(value ?? false) : null,
+        contentPadding: EdgeInsets.zero,
+        controlAffinity: ListTileControlAffinity.trailing,
+        secondary: const CircleAvatar(
+          backgroundColor: Color(0xFFFFE4EF),
+          child: Icon(Icons.sports_esports, color: Color(0xFFC2185B)),
+        ),
+        title: Text(
+          enabled ? 'Use Glow Points' : 'Glow Points available',
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        subtitle: Text(
+          enabled
+              ? '$points points can save PKR $discount on this order.'
+              : '$points points saved. Minimum eligible order required.',
+        ),
       ),
     );
   }

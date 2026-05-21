@@ -9,6 +9,7 @@ import '../models/banner.dart';
 import '../models/cart_item.dart';
 import '../models/category.dart';
 import '../models/checkout_info.dart';
+import '../models/game_reward_signal.dart';
 import '../models/order.dart';
 import '../models/order_product.dart';
 import '../models/product.dart';
@@ -29,6 +30,8 @@ class AppState extends ChangeNotifier {
 
   static const _userKey = 'glowza_user';
   static const _checkoutKey = 'glowza_checkout';
+  static const _gameWalletKey = 'glowza_game_wallet';
+  static const _gameWalletDateKey = 'glowza_game_wallet_date';
 
   final FirestoreRepository _repository;
   final NotificationService _notificationService;
@@ -47,6 +50,8 @@ class AppState extends ChangeNotifier {
   bool _isLoadingMoreProducts = false;
   String? _lastOrderId;
   bool _isBusy = false;
+  int _gamePoints = 0;
+  int _gamePointsEarnedToday = 0;
 
   UserProfile? get user => _user;
   CheckoutInfo get savedCheckout => _savedCheckout;
@@ -65,6 +70,23 @@ class AppState extends ChangeNotifier {
   int get subtotal => _cart.fold(0, (total, item) => total + item.lineTotal);
   int get deliveryCharges => _cart.isEmpty ? 0 : AppConstants.deliveryCharges;
   int get grandTotal => subtotal + deliveryCharges;
+  int get gamePoints => _gamePoints;
+  int get gamePointsEarnedToday => _gamePointsEarnedToday;
+  int get gameDiscountValue {
+    if (subtotal < AppConstants.gameRewardMinimumOrder) {
+      return 0;
+    }
+    final pointsValue = _gamePoints ~/ AppConstants.gamePointsPerRupee;
+    final orderCap = (subtotal * AppConstants.gameRewardMaxOrderPercent)
+        .floor();
+    return [
+      pointsValue,
+      AppConstants.gameRewardMaxDiscount,
+      orderCap,
+    ].reduce((a, b) => a < b ? a : b);
+  }
+
+  bool get canUseGameDiscount => gameDiscountValue > 0;
 
   Future<void> loadSavedState() async {
     final prefs = await SharedPreferences.getInstance();
@@ -89,6 +111,7 @@ class AppState extends ChangeNotifier {
         jsonDecode(checkoutJson) as Map<String, dynamic>,
       );
     }
+    await _loadGameWallet(prefs);
     await loadCatalog();
     await loadUserOrders();
     await registerDeviceForNotifications();
@@ -165,6 +188,48 @@ class AppState extends ChangeNotifier {
     _orders = [];
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userKey);
+    notifyListeners();
+  }
+
+  Future<void> grantGameReward(GameRewardSignal signal) async {
+    if (signal.rewardedAdsCompleted <= 0 ||
+        signal.durationSeconds < AppConstants.gameRewardMinimumSessionSeconds) {
+      return;
+    }
+    final timeQualifiedAds =
+        signal.durationSeconds ~/ AppConstants.gameRewardSecondsPerCreditedAd;
+    final creditedAds = signal.rewardedAdsCompleted.clamp(0, timeQualifiedAds);
+    if (creditedAds <= 0) {
+      return;
+    }
+    final estimatedRevenuePkr =
+        creditedAds * AppConstants.gameEstimatedRewardedAdRevenuePkr;
+    final userRewardValuePkr =
+        estimatedRevenuePkr * AppConstants.gameUserRewardShare;
+    final rawPoints = (userRewardValuePkr * AppConstants.gamePointsPerRupee)
+        .round();
+    final remainingDailyCap =
+        AppConstants.gameRewardDailyPointCap - _gamePointsEarnedToday;
+    if (remainingDailyCap <= 0) {
+      return;
+    }
+    final granted = rawPoints.clamp(0, remainingDailyCap).toInt();
+    if (granted == 0) {
+      return;
+    }
+    _gamePoints += granted;
+    _gamePointsEarnedToday += granted;
+    await _saveGameWallet();
+    notifyListeners();
+  }
+
+  Future<void> spendGamePointsForDiscount(int discountValue) async {
+    if (discountValue <= 0) {
+      return;
+    }
+    final points = discountValue * AppConstants.gamePointsPerRupee;
+    _gamePoints = (_gamePoints - points).clamp(0, 1 << 31).toInt();
+    await _saveGameWallet();
     notifyListeners();
   }
 
@@ -333,7 +398,10 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> placeOrder({required CheckoutInfo checkoutInfo}) async {
+  Future<void> placeOrder({
+    required CheckoutInfo checkoutInfo,
+    int gameDiscount = 0,
+  }) async {
     final currentUser = _user;
     if (currentUser == null || _cart.isEmpty) {
       return;
@@ -343,6 +411,7 @@ class AppState extends ChangeNotifier {
     try {
       final orderNumber =
           'GLZ-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+      final safeGameDiscount = gameDiscount.clamp(0, gameDiscountValue).toInt();
       final order = GlowzaOrder(
         id: '',
         userId: currentUser.id,
@@ -352,8 +421,8 @@ class AppState extends ChangeNotifier {
         paymentStatus: 'unpaid',
         subtotal: subtotal,
         shippingFee: deliveryCharges,
-        discount: 0,
-        total: grandTotal,
+        discount: safeGameDiscount,
+        total: grandTotal - safeGameDiscount,
         totalItems: cartCount,
         customerName: checkoutInfo.fullName,
         customerPhone: checkoutInfo.phoneNumber,
@@ -373,6 +442,9 @@ class AppState extends ChangeNotifier {
             .toList(),
       );
       await _repository.createOrder(order);
+      if (safeGameDiscount > 0) {
+        await spendGamePointsForDiscount(safeGameDiscount);
+      }
       _lastOrderId = orderNumber;
       _orders = [order, ..._orders];
       _cart.clear();
@@ -385,5 +457,26 @@ class AppState extends ChangeNotifier {
   void _setBusy(bool value) {
     _isBusy = value;
     notifyListeners();
+  }
+
+  Future<void> _loadGameWallet(SharedPreferences prefs) async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final walletDate = prefs.getString(_gameWalletDateKey);
+    _gamePoints = prefs.getInt(_gameWalletKey) ?? 0;
+    if (walletDate == today) {
+      _gamePointsEarnedToday = prefs.getInt('${_gameWalletKey}_today') ?? 0;
+    } else {
+      _gamePointsEarnedToday = 0;
+      await prefs.setString(_gameWalletDateKey, today);
+      await prefs.setInt('${_gameWalletKey}_today', 0);
+    }
+  }
+
+  Future<void> _saveGameWallet() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    await prefs.setInt(_gameWalletKey, _gamePoints);
+    await prefs.setString(_gameWalletDateKey, today);
+    await prefs.setInt('${_gameWalletKey}_today', _gamePointsEarnedToday);
   }
 }

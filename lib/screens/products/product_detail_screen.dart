@@ -215,6 +215,11 @@ class _InfoBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final formattedBody = body
+        .replaceAll(RegExp(r'\s*\\+\s*'), '\n')
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n');
+
     return Padding(
       padding: const EdgeInsets.only(top: 20),
       child: Column(
@@ -226,7 +231,7 @@ class _InfoBlock extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            body,
+            formattedBody,
             style: TextStyle(color: Colors.grey.shade700, height: 1.45),
           ),
         ],

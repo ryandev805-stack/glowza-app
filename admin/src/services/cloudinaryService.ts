@@ -23,7 +23,7 @@ export async function uploadToCloudinary(file: File): Promise<string> {
   formData.append('folder', folder);
 
   const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+    `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
     {
       method: 'POST',
       body: formData,
@@ -37,14 +37,18 @@ export async function uploadToCloudinary(file: File): Promise<string> {
 }
 
 export async function importImageUrlToCloudinary(imageUrl: string): Promise<string> {
+  return importMediaUrlToCloudinary(imageUrl);
+}
+
+export async function importMediaUrlToCloudinary(mediaUrl: string): Promise<string> {
   const response = await fetch('/api/cloudinary-upload-url', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ imageUrl }),
+    body: JSON.stringify({ mediaUrl }),
   });
   const body = await response.json();
   if (!response.ok) {
-    throw new Error(body.error || 'Cloudinary URL import failed');
+    throw new Error(body.error || 'Cloudinary media import failed');
   }
   return body.secureUrl as string;
 }

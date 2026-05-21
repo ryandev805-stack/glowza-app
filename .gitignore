@@ -50,3 +50,11 @@ app.*.map.json
 /admin/.env
 /admin/.vercel/
 /admin/tsconfig.tsbuildinfo
+/website/node_modules/
+/website/dist/
+/website/.env
+/website/.vercel/
+/games/*/node_modules/
+/games/*/dist/
+/games/*/.env
+/games/*/.vercel/

@@ -49,22 +49,22 @@ export default async function handler(request, response) {
     return response.status(500).json({ error: 'Cloudinary server env vars are missing' });
   }
 
-  const imageUrl = String(request.body?.imageUrl || '').trim();
-  if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) {
-    return response.status(400).json({ error: 'Valid image URL is required' });
+  const mediaUrl = String(request.body?.mediaUrl || request.body?.imageUrl || '').trim();
+  if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) {
+    return response.status(400).json({ error: 'Valid media URL is required' });
   }
 
   const timestamp = Math.round(Date.now() / 1000);
   const params = { folder, timestamp };
   const signature = sign(params, apiSecret);
   const formData = new FormData();
-  formData.append('file', imageUrl);
+  formData.append('file', mediaUrl);
   formData.append('folder', folder);
   formData.append('timestamp', String(timestamp));
   formData.append('api_key', apiKey);
   formData.append('signature', signature);
 
-  const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+  const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
     method: 'POST',
     body: formData,
   });
@@ -72,7 +72,7 @@ export default async function handler(request, response) {
 
   if (!uploadResponse.ok) {
     return response.status(uploadResponse.status).json({
-      error: body.error?.message || 'Cloudinary URL import failed',
+      error: body.error?.message || 'Cloudinary media import failed',
     });
   }
 

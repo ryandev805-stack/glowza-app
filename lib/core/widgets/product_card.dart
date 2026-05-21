@@ -40,7 +40,63 @@ class ProductCard extends StatelessWidget {
             SizedBox(
               height: 170,
               width: double.infinity,
-              child: ProductImage(imageUrl: product.imageUrl),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: ProductImage(imageUrl: product.imageUrl),
+                  ),
+                  if (product.videos.isNotEmpty)
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.92),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.play_circle_fill_rounded,
+                          color: AppTheme.primary,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Material(
+                      color: Colors.white.withValues(alpha: 0.92),
+                      shape: const CircleBorder(),
+                      elevation: 3,
+                      child: IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 38,
+                          height: 38,
+                        ),
+                        onPressed: () => appState.toggleWishlist(product.id),
+                        icon: Icon(
+                          isWishlisted ? Icons.favorite : Icons.favorite_border,
+                          color: isWishlisted
+                              ? AppTheme.primary
+                              : AppTheme.wine,
+                          size: 21,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
@@ -58,29 +114,7 @@ class ProductCard extends StatelessWidget {
                   //     fontSize: 11,
                   //   ),
                   // ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: PriceText(price: product.price, large: true),
-                      ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 34,
-                          height: 34,
-                        ),
-                        onPressed: () => appState.toggleWishlist(product.id),
-                        icon: Icon(
-                          isWishlisted ? Icons.favorite : Icons.favorite_border,
-                          color: isWishlisted
-                              ? AppTheme.primary
-                              : AppTheme.wine,
-                          size: 20,
-                        ),
-                      ),
-                    ],
-                  ),
+                  PriceText(price: product.price, large: true),
                   const SizedBox(height: 3),
                   Text(
                     product.name,

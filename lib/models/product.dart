@@ -19,6 +19,7 @@ class Product {
     required this.howToUse,
     required this.imageUrl,
     this.images = const [],
+    this.videos = const [],
     this.reviews = const [],
     this.stock = 0,
     this.isActive = true,
@@ -47,6 +48,7 @@ class Product {
   final String howToUse;
   final String imageUrl;
   final List<String> images;
+  final List<String> videos;
   final List<ProductReview> reviews;
   final int stock;
   final bool isActive;
@@ -65,6 +67,9 @@ class Product {
     final price = (data['price'] as num?)?.round() ?? 0;
     final stock = (data['stock'] as num?)?.round() ?? 0;
     final images = (data['images'] as List<dynamic>? ?? [])
+        .whereType<String>()
+        .toList();
+    final videos = (data['videos'] as List<dynamic>? ?? [])
         .whereType<String>()
         .toList();
     final imageUrl =
@@ -87,6 +92,7 @@ class Product {
       howToUse: data['howToUse'] as String? ?? '',
       imageUrl: imageUrl,
       images: images.isEmpty && imageUrl.isNotEmpty ? [imageUrl] : images,
+      videos: videos,
       reviews: (data['reviews'] as List<dynamic>? ?? [])
           .whereType<Map>()
           .map(
@@ -113,6 +119,7 @@ class Product {
       'categoryId': categoryId,
       'image': imageUrl,
       'images': images.isEmpty ? [imageUrl] : images,
+      'videos': videos,
       'stock': stock,
       'isActive': isActive,
       if (includeCreatedAt) 'createdAt': FieldValue.serverTimestamp(),

@@ -8,6 +8,7 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  writeBatch,
   where,
   type DocumentData,
   type QueryDocumentSnapshot,
@@ -108,6 +109,9 @@ export async function saveProduct(input: Omit<Product, 'id'> & { id?: string }) 
   const images = (input.images || [])
     .map((image) => image.trim())
     .filter(Boolean);
+  const videos = (input.videos || [])
+    .map((video) => video.trim())
+    .filter(Boolean);
   const mainImage = input.image.trim() || images[0] || '';
   const price = Number(input.price) || 0;
   const oldPrice = Number(input.oldPrice) || price;
@@ -134,6 +138,7 @@ export async function saveProduct(input: Omit<Product, 'id'> & { id?: string }) 
     categoryId: input.categoryId,
     image: mainImage,
     images: [mainImage, ...images.filter((image) => image !== mainImage)].filter(Boolean),
+    videos,
     stock: Number(input.stock) || 0,
     isActive: input.isActive,
     brand: input.brand?.trim() || 'Glowza',
@@ -149,6 +154,22 @@ export async function saveProduct(input: Omit<Product, 'id'> & { id?: string }) 
     isNew: Boolean(input.isNew),
     isBestSeller: Boolean(input.isBestSeller),
     isFlashSale: Boolean(input.isFlashSale),
+    source: input.source || '',
+    sourceUrl: input.sourceUrl || '',
+    markazPrice: Number(input.markazPrice) || 0,
+    markupPercent: Number(input.markupPercent) || 0,
+    cutPriceMarkupPercent: Number(input.cutPriceMarkupPercent) || 0,
+    winningScore: Number(input.winningScore) || 0,
+    importStatus: input.importStatus || '',
+    needsReview: Boolean(input.needsReview),
+    markazStatus: input.markazStatus || '',
+    markazVariationId: input.markazVariationId || '',
+    markazVariationName: input.markazVariationName || '',
+    sourceSyncedAt: input.sourceSyncedAt || null,
+    sourceImages: input.sourceImages || [],
+    sourceVideos: input.sourceVideos || [],
+    syncChangeSummary: input.syncChangeSummary || [],
+    syncChangeCount: Number(input.syncChangeCount) || 0,
     updatedAt: serverTimestamp(),
   };
   if (input.id) {
@@ -164,6 +185,26 @@ export async function saveProduct(input: Omit<Product, 'id'> & { id?: string }) 
 
 export async function deleteProduct(id: string) {
   await deleteDoc(doc(db, paths.products, id));
+}
+
+export async function bulkUpdateProducts(
+  ids: string[],
+  patch: Partial<Pick<Product, 'isActive' | 'needsReview' | 'isNew' | 'isBestSeller' | 'isFlashSale'>>,
+) {
+  const batch = writeBatch(db);
+  ids.forEach((id) => {
+    batch.update(doc(db, paths.products, id), {
+      ...patch,
+      updatedAt: serverTimestamp(),
+    });
+  });
+  await batch.commit();
+}
+
+export async function bulkDeleteProducts(ids: string[]) {
+  const batch = writeBatch(db);
+  ids.forEach((id) => batch.delete(doc(db, paths.products, id)));
+  await batch.commit();
 }
 
 export async function updateProductReviews(productId: string, inputReviews: ProductReview[]) {
@@ -258,6 +299,13 @@ export async function sendNotificationCampaign(input: Omit<NotificationCampaign,
 export async function listUsers(): Promise<User[]> {
   const snapshot = await getDocs(query(collection(db, paths.users), orderBy('createdAt', 'desc')));
   return snapshot.docs.map((doc) => withId<User>(doc));
+}
+
+export async function updateUserProfile(id: string, input: Partial<Pick<User, 'name' | 'role' | 'isBlocked'>>) {
+  await updateDoc(doc(db, paths.users, id), {
+    ...input,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function listOrders(): Promise<Order[]> {

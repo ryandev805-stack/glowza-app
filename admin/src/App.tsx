@@ -1,4 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { ComponentType } from 'react';
+import {
+  Bell,
+  Boxes,
+  ChartNoAxesCombined,
+  Flag,
+  FolderTree,
+  LogOut,
+  Menu,
+  PackagePlus,
+  PackageSearch,
+  ScanSearch,
+  ShieldCheck,
+  ShoppingBag,
+  Star,
+  Users,
+} from 'lucide-react';
 import { isAdminLoggedIn, loginAdmin, logoutAdmin } from './auth';
 import { BannersPage } from './pages/BannersPage';
 import { CategoriesPage } from './pages/CategoriesPage';
@@ -8,10 +25,12 @@ import { ProductEditorPage, ProductsPage } from './pages/ProductsPage';
 import { ReviewsPage } from './pages/ReviewsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { UsersPage } from './pages/UsersPage';
+import { WinningProductsPage } from './pages/WinningProductsPage';
 
 type RouteId =
   | 'dashboard'
   | 'products'
+  | 'winning-products'
   | 'product-new'
   | 'product-edit'
   | 'categories'
@@ -31,15 +50,21 @@ type AppRoute = {
   orderId?: string;
 };
 
-const navItems = [
-  { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'D' },
-  { id: 'products', label: 'Products', path: '/products', icon: 'P' },
-  { id: 'categories', label: 'Categories', path: '/categories', icon: 'C' },
-  { id: 'banners', label: 'Banners', path: '/banners', icon: 'B' },
-  { id: 'orders', label: 'Orders', path: '/orders', icon: 'O' },
-  { id: 'reviews', label: 'Reviews', path: '/reviews', icon: 'R' },
-  { id: 'notifications', label: 'Notify', path: '/notifications', icon: 'N' },
-  { id: 'users', label: 'Users', path: '/users', icon: 'U' },
+const navItems: Array<{
+  id: AppRoute['section'];
+  label: string;
+  path: string;
+  icon: ComponentType<{ size?: number; strokeWidth?: number }>;
+}> = [
+  { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: ChartNoAxesCombined },
+  { id: 'products', label: 'Products', path: '/products', icon: PackageSearch },
+  { id: 'winning-products', label: 'Winning', path: '/winning-products', icon: ScanSearch },
+  { id: 'categories', label: 'Categories', path: '/categories', icon: FolderTree },
+  { id: 'banners', label: 'Banners', path: '/banners', icon: Flag },
+  { id: 'orders', label: 'Orders', path: '/orders', icon: ShoppingBag },
+  { id: 'reviews', label: 'Reviews', path: '/reviews', icon: Star },
+  { id: 'notifications', label: 'Notify', path: '/notifications', icon: Bell },
+  { id: 'users', label: 'Users', path: '/users', icon: Users },
 ] as const;
 
 function parseRoute(pathname: string): AppRoute {
@@ -69,6 +94,7 @@ function parseRoute(pathname: string): AppRoute {
     };
   }
   if (path === '/products') return { id: 'products', title: 'Products', path, section: 'products' };
+  if (path === '/winning-products') return { id: 'winning-products', title: 'Winning Products', path, section: 'winning-products' };
   if (path === '/categories') return { id: 'categories', title: 'Categories', path, section: 'categories' };
   if (path === '/banners') return { id: 'banners', title: 'Banners', path, section: 'banners' };
   if (path === '/orders') return { id: 'orders', title: 'Orders', path, section: 'orders' };
@@ -98,6 +124,7 @@ function useAdminRoute() {
 
 export function App() {
   const [loggedIn, setLoggedIn] = useState(isAdminLoggedIn());
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { route, navigate } = useAdminRoute();
 
   useEffect(() => {
@@ -110,8 +137,18 @@ export function App() {
     return <LoginPage onLogin={() => { setLoggedIn(true); navigate('/dashboard'); }} />;
   }
 
+  const goTo = (path: string) => {
+    navigate(path);
+    setMobileSidebarOpen(false);
+  };
+
   return (
-    <div className="admin-shell">
+    <div className={`admin-shell ${mobileSidebarOpen ? 'sidebar-open' : ''}`}>
+      <button
+        className="sidebar-scrim"
+        aria-label="Close menu"
+        onClick={() => setMobileSidebarOpen(false)}
+      />
       <aside className="admin-sidebar">
         <BrandBlock subtitle="Admin Console" />
         <nav className="admin-nav" aria-label="Admin sections">
@@ -119,9 +156,9 @@ export function App() {
             <button
               key={item.id}
               className={route.section === item.id ? 'active' : ''}
-              onClick={() => navigate(item.path)}
+              onClick={() => goTo(item.path)}
             >
-              <span>{item.icon}</span>
+              <span className="nav-icon"><item.icon size={18} /></span>
               {item.label}
             </button>
           ))}
@@ -133,15 +170,19 @@ export function App() {
             setLoggedIn(false);
           }}
         >
+          <LogOut size={18} />
           Logout
         </button>
       </aside>
 
       <div className="admin-workspace">
         <header className="admin-topbar">
+          <button className="mobile-menu-button" onClick={() => setMobileSidebarOpen(true)} aria-label="Open menu">
+            <Menu size={20} />
+          </button>
           <BrandBlock subtitle={route.title} />
           <div className="topbar-actions">
-            <button className="ghost" onClick={() => navigate('/products/new')}>New Product</button>
+            <button className="ghost" onClick={() => goTo('/products/new')}><PackagePlus size={17} /> New Product</button>
             <button
               className="ghost"
               onClick={() => {
@@ -149,6 +190,7 @@ export function App() {
                 setLoggedIn(false);
               }}
             >
+              <LogOut size={17} />
               Logout
             </button>
           </div>
@@ -157,19 +199,6 @@ export function App() {
         <main className="admin-content">
           <RouteView route={route} navigate={navigate} />
         </main>
-
-        <nav className="mobile-tabs" aria-label="Admin mobile navigation">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              className={route.section === item.id ? 'active' : ''}
-              onClick={() => navigate(item.path)}
-            >
-              <span>{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
-        </nav>
       </div>
     </div>
   );
@@ -188,6 +217,7 @@ function RouteView({
       products: () => navigate('/products'),
       newProduct: () => navigate('/products/new'),
       editProduct: (id: string) => navigate(`/products/${encodeURIComponent(id)}/edit`),
+      winningProducts: () => navigate('/winning-products'),
       categories: () => navigate('/categories'),
       banners: () => navigate('/banners'),
       orders: () => navigate('/orders'),
@@ -202,6 +232,8 @@ function RouteView({
   switch (route.id) {
     case 'products':
       return <ProductsPage onCreate={actions.newProduct} onEdit={actions.editProduct} />;
+    case 'winning-products':
+      return <WinningProductsPage onEdit={actions.editProduct} />;
     case 'product-new':
       return <ProductEditorPage onDone={actions.products} />;
     case 'product-edit':
@@ -228,7 +260,7 @@ function RouteView({
 function BrandBlock({ subtitle }: { subtitle: string }) {
   return (
     <div className="brand">
-      <img className="brand-mark" src="/app_icon.png" alt="Glowza" />
+      <img className="brand-mark" src="/app-icon-dot.png" alt="Glowza" />
       <div>
         <strong>Glowza</strong>
         <span>{subtitle}</span>
@@ -255,11 +287,17 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
           }
         }}
       >
+        <div className="login-badge"><ShieldCheck size={22} /></div>
         <BrandBlock subtitle="Private management console" />
+        <div>
+          <span className="eyebrow">Secure Console</span>
+          <h1>Manage Glowza operations</h1>
+          <p>Products, banners, orders, users, reviews, and notifications in one Firebase-backed workspace.</p>
+        </div>
         <label>Email<input value={email} onChange={(event) => setEmail(event.target.value)} /></label>
         <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
         {error && <p className="error">{error}</p>}
-        <button type="submit">Login</button>
+        <button type="submit"><Boxes size={18} /> Login to Admin</button>
       </form>
     </main>
   );

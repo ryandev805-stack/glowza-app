@@ -9,6 +9,8 @@ import '../screens/cart/cart_screen.dart';
 import '../screens/categories/category_listing_screen.dart';
 import '../screens/checkout/checkout_screen.dart';
 import '../screens/checkout/order_confirmation_screen.dart';
+import '../screens/games/games_hub_screen.dart';
+import '../screens/games/wordly_plus_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/products/product_detail_screen.dart';
 import '../screens/products/product_listing_screen.dart';
@@ -62,6 +64,14 @@ class AppRouter {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/games',
+                builder: (context, state) => const GamesHubScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/cart',
                 builder: (context, state) => const CartScreen(),
               ),
@@ -76,6 +86,11 @@ class AppRouter {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/games/wordly-plus',
+        builder: (context, state) => const WordlyPlusScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,
@@ -132,6 +147,11 @@ class MainShell extends StatelessWidget {
             icon: Icon(Icons.grid_view_outlined),
             selectedIcon: Icon(Icons.grid_view),
             label: 'Categories',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.sports_esports_outlined),
+            selectedIcon: Icon(Icons.sports_esports),
+            label: 'Games',
           ),
           NavigationDestination(
             icon: Badge(
