@@ -316,7 +316,7 @@ class _GlowTileMergeScreenState extends State<GlowTileMergeScreen> {
             ),
             const SizedBox(height: 18),
             Text(
-              'Swipe to merge matching beauty tiles. Reach higher tiles and survive longer.',
+              'Swipe to merge matching Glowza tiles. Reach higher tiles and survive longer.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.72),

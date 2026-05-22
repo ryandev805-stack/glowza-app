@@ -20,7 +20,7 @@ class CartScreen extends StatelessWidget {
               icon: Icons.shopping_bag_outlined,
               title: 'Your cart is empty',
               message:
-                  'Add cosmetics you love and checkout with cash on delivery.',
+                  'Add products you love and checkout with cash on delivery.',
             )
           : ListView(
               padding: const EdgeInsets.all(20),

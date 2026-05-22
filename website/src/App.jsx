@@ -413,12 +413,12 @@ function HomePage({ store, setActive, setCategory, onOpenProduct, onCart, onWish
           </div>
           <span className="mb-3 inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-2 text-[11px] font-black uppercase tracking-wide sm:mb-4 sm:px-4 sm:text-xs">
             <Sparkles size={14} />
-            Premium beauty in Pakistan
+            Pakistan's everyday online store
           </span>
-          <h1 className="max-w-3xl text-4xl font-black leading-none sm:text-6xl lg:text-7xl">Glow that feels curated.</h1>
-          <p className="mt-4 max-w-2xl text-sm font-semibold text-white/80 sm:mt-5 sm:text-lg">Shop skincare, makeup, fragrances, Korean beauty, and grooming essentials with a smooth checkout experience.</p>
+          <h1 className="max-w-3xl text-4xl font-black leading-none sm:text-6xl lg:text-7xl">Everything feels easier on Glowza.</h1>
+          <p className="mt-4 max-w-2xl text-sm font-semibold text-white/80 sm:mt-5 sm:text-lg">Shop fashion, beauty, jewellery, home, kitchen, accessories, gadgets, and daily essentials with a smooth checkout experience.</p>
           <button className="mt-5 flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 text-left font-bold text-glowza-pink shadow-sm sm:hidden" onClick={() => setActive('Shop')}>
-            <span className="inline-flex items-center gap-2"><Search size={18} /> Search beauty products</span>
+            <span className="inline-flex items-center gap-2"><Search size={18} /> Search products</span>
             <ChevronRight size={18} />
           </button>
           <div className="mt-6 flex flex-wrap gap-3 sm:mt-7">
@@ -444,8 +444,8 @@ function HomePage({ store, setActive, setCategory, onOpenProduct, onCart, onWish
           ) : (
             <div className="grid h-[220px] place-items-center bg-gradient-to-br from-pink-100 to-purple-100 p-8 text-center sm:h-[520px] sm:p-10">
               <div>
-                <p className="text-sm font-black uppercase text-glowza-pink">Glowza Edit</p>
-                <h2 className="mt-3 text-2xl font-black text-glowza-plum sm:text-4xl">New beauty drops are waiting.</h2>
+                <p className="text-sm font-black uppercase text-glowza-pink">Glowza Deals</p>
+                <h2 className="mt-3 text-2xl font-black text-glowza-plum sm:text-4xl">New arrivals are waiting.</h2>
               </div>
             </div>
           )}
@@ -535,7 +535,7 @@ function ShopPage({ store, products, query, setQuery, category, setCategory, sor
         <div className="grid gap-3 lg:grid-cols-[1fr_220px_180px]">
           <label className="relative block">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-glowza-pink" size={18} />
-            <input className="focus-ring w-full rounded-2xl border border-pink-100 py-3.5 pl-11 pr-4 text-sm sm:py-4 sm:text-base" placeholder="Search makeup, skincare..." value={query} onChange={(event) => setQuery(event.target.value)} />
+            <input className="focus-ring w-full rounded-2xl border border-pink-100 py-3.5 pl-11 pr-4 text-sm sm:py-4 sm:text-base" placeholder="Search fashion, gadgets, home..." value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
           <select className="focus-ring rounded-2xl border border-pink-100 px-4 py-3.5 text-sm sm:py-4 sm:text-base" value={category} onChange={(event) => setCategory(event.target.value)}>
             <option value="all">All categories</option>
@@ -926,10 +926,10 @@ function ProductModal({ product, store, onClose, onBuyNow, onOpenRelated, onLogi
               {activeInfo === 'description' && (
                 descriptionHtml
                   ? <div dangerouslySetInnerHTML={{ __html: descriptionHtml }} />
-                  : 'A curated Glowza beauty essential selected for everyday routines and premium gifting.'
+                  : 'A curated Glowza product selected for everyday use, smart gifting, and great value.'
               )}
               {activeInfo === 'ingredients' && (product.ingredients || 'Ingredient details will be updated soon. Always patch test before regular use.')}
-              {activeInfo === 'usage' && (product.howToUse || product.howTo || 'Apply as needed according to your beauty routine. Store in a cool, dry place.')}
+              {activeInfo === 'usage' && (product.howToUse || product.howTo || 'Use as directed by the seller. Store safely and keep product packaging for care instructions.')}
             </div>
           </div>
 
@@ -1217,7 +1217,7 @@ function PrivacyPolicyPage() {
         <p className="text-sm font-black uppercase text-white/70">Glowza Pakistan</p>
         <h1 className="mt-2 text-4xl font-black leading-tight sm:text-5xl">Privacy Policy</h1>
         <p className="mt-4 max-w-3xl text-sm font-semibold leading-6 text-white/78 sm:text-base">
-          This policy explains how Glowza collects, uses, and protects information across our cosmetics ecommerce website,
+          This policy explains how Glowza collects, uses, and protects information across our ecommerce website,
           mobile app, admin operations, rewards features, and customer support.
         </p>
         <p className="mt-5 rounded-2xl bg-white/12 px-4 py-3 text-sm font-bold text-white/85">
@@ -1252,7 +1252,7 @@ function Footer({ onPrivacy }) {
         <div>
           <img src="/app-icon-dot.png" alt="Glowza" className="h-14 w-14 rounded-2xl" />
           <h2 className="mt-4 text-2xl font-black text-glowza-plum">Glowza</h2>
-          <p className="mt-2 text-sm text-slate-500">Pakistan-based cosmetics ecommerce powered by Firebase.</p>
+          <p className="mt-2 text-sm text-slate-500">Pakistan-based online store powered by Firebase.</p>
         </div>
         <div>
           <h3 className="font-black text-glowza-plum">Shopping</h3>

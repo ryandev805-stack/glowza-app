@@ -44,7 +44,7 @@ export function BannersPage() {
         </div>
         <label>Title<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
         <ImageField label="Banner Image" value={form.image} onChange={(image) => setForm({ ...form, image })} />
-        <label>Link<input placeholder="/product/productId or /products?category=Makeup" value={form.link} onChange={(event) => setForm({ ...form, link: event.target.value })} /></label>
+        <label>Link<input placeholder="/product/productId or /products?category=Fashion" value={form.link} onChange={(event) => setForm({ ...form, link: event.target.value })} /></label>
         <label>Sort Order<input type="number" value={form.sortOrder} onChange={(event) => setForm({ ...form, sortOrder: Number(event.target.value) })} /></label>
         <label className="check"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} /> Active</label>
         {form.id && <button type="button" className="ghost" onClick={() => setForm(emptyBanner)}>Cancel Edit</button>}

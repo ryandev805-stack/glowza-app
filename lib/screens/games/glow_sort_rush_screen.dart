@@ -423,7 +423,7 @@ class _GamePainter extends CustomPainter {
     Color(0xFFD4AF37),
     Color(0xFF66D9A3),
   ];
-  static const labels = ['Makeup', 'Skin', 'Hair', 'Tools'];
+  static const labels = ['Style', 'Tech', 'Home', 'Gifts'];
   static const icons = [
     Icons.brush,
     Icons.water_drop,

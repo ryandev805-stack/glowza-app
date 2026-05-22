@@ -41,7 +41,7 @@ class _SplashScreenState extends State<SplashScreen> {
               GlowzaLogo(),
               SizedBox(height: 18),
               Text(
-                'Premium beauty, delivered across Pakistan',
+                'Everything you love, delivered across Pakistan',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ],

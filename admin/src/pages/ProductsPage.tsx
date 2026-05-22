@@ -213,7 +213,7 @@ export function ProductsPage({
         <div>
           <span className="eyebrow">Catalogue</span>
           <h1>Products</h1>
-          <p>Manage Glowza inventory, pricing, product media, and storefront visibility.</p>
+          <p>Manage Glowza catalog, pricing, product media, and storefront visibility.</p>
         </div>
         <button onClick={onCreate}>Add Product</button>
       </div>

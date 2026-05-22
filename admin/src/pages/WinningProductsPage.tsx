@@ -181,7 +181,7 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
         <div>
           <span className="eyebrow">Automation</span>
           <h1>Winning Products</h1>
-          <p>Scan Markaz category pages, score skincare opportunities, and import selected products as inactive drafts for review.</p>
+          <p>Scan Markaz category pages, score product opportunities, and import selected products as inactive drafts for review.</p>
         </div>
         <button disabled={loading} onClick={() => void scan()}><Search size={17} /> {loading ? 'Scanning...' : 'Find Winning Products'}</button>
       </div>

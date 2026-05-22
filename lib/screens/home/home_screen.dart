@@ -42,13 +42,13 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      'Hello, ${user?.fullName.split(' ').first ?? 'Beauty'}',
+                      'Hello, ${user?.fullName.split(' ').first ?? 'Shopper'}',
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'Premium makeup, skincare and fragrance picks.',
+                      'Fresh finds across fashion, beauty, home, tech and more.',
                       style: TextStyle(
                         color: AppTheme.wine,
                         fontWeight: FontWeight.w400,
@@ -59,7 +59,7 @@ class HomeScreen extends StatelessWidget {
                       readOnly: true,
                       onTap: () => context.push('/products'),
                       decoration: const InputDecoration(
-                        hintText: 'Search lipstick, serum, perfume...',
+                        hintText: 'Search fashion, gadgets, home items...',
                         prefixIcon: Icon(Icons.search),
                       ),
                     ),

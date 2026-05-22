@@ -46,6 +46,24 @@ class Category {
 
   static IconData iconForName(String name) {
     final normalized = name.toLowerCase();
+    if (normalized.contains('fashion') || normalized.contains('cloth')) {
+      return Icons.checkroom;
+    }
+    if (normalized.contains('electronic') || normalized.contains('gadget')) {
+      return Icons.devices;
+    }
+    if (normalized.contains('home') || normalized.contains('living')) {
+      return Icons.chair;
+    }
+    if (normalized.contains('kitchen')) return Icons.kitchen;
+    if (normalized.contains('jewellery') || normalized.contains('jewelry')) {
+      return Icons.diamond_outlined;
+    }
+    if (normalized.contains('kids') || normalized.contains('baby')) {
+      return Icons.child_care;
+    }
+    if (normalized.contains('accessor')) return Icons.watch;
+    if (normalized.contains('beauty')) return Icons.spa;
     if (normalized.contains('makeup')) return Icons.face_retouching_natural;
     if (normalized.contains('skin')) return Icons.spa;
     if (normalized.contains('hair')) return Icons.brush;
@@ -54,6 +72,6 @@ class Category {
     if (normalized.contains('nail')) return Icons.back_hand;
     if (normalized.contains('korean')) return Icons.water_drop;
     if (normalized.contains('men')) return Icons.person;
-    return Icons.spa;
+    return Icons.shopping_bag_outlined;
   }
 }

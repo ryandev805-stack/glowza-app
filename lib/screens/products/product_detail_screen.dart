@@ -365,7 +365,7 @@ class _ReviewsSection extends StatelessWidget {
                           Text(
                             reviewCount == 0
                                 ? 'No reviews yet'
-                                : 'Loved by Glowza customers',
+                                : 'Trusted by Glowza customers',
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 4),
@@ -405,7 +405,7 @@ class _ReviewsSection extends StatelessWidget {
               children: const [
                 _ReviewChip(label: 'Quality checked'),
                 _ReviewChip(label: 'Real customer feedback'),
-                _ReviewChip(label: 'Beauty community'),
+                _ReviewChip(label: 'Verified shoppers'),
               ],
             ),
             const SizedBox(height: 14),
@@ -474,7 +474,7 @@ class _ReviewEligibilityCardState extends State<_ReviewEligibilityCard> {
         ? 'Review unlocks after delivery'
         : _alreadyReviewed
         ? 'Review already submitted'
-        : 'Share your Glowza experience';
+        : 'Share your Glowza shopping experience';
     final subtitle = widget.deliveredOrder == null
         ? 'Only customers with a delivered order can review this product.'
         : _alreadyReviewed

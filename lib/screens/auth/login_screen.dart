@@ -43,7 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const GlowzaLogo(),
               const SizedBox(height: 18),
               Text(
-                'Pakistan beauty essentials, curated with a premium shopping experience.',
+                'Pakistan online shopping made simple, stylish, and reliable.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: const Color(0xFF6A2848),
                   height: 1.45,
