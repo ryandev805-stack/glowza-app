@@ -1165,6 +1165,7 @@ button.review-summary {
 
 .detail-grid div,
 .totals div {
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface-2);
@@ -1177,6 +1178,13 @@ button.review-summary {
   margin-bottom: 5px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.detail-grid strong,
+.totals strong,
+.detail-block p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .detail-block {
@@ -1648,12 +1656,68 @@ button.review-summary {
   }
 
   .orders-page .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
+  }
+
+  .orders-page,
+  .orders-page .panel,
+  .orders-page .orders-layout,
+  .orders-page .detail-panel,
+  .orders-page .toolbar,
+  .orders-page .data-list,
+  .orders-page .detail-block,
+  .orders-page .order-products,
+  .orders-page .totals,
+  .orders-page .detail-grid {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  .orders-page .page-hero,
+  .orders-page .metric-card,
+  .orders-page .data-card,
+  .orders-page .order-product {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .orders-page button,
+  .orders-page select,
+  .orders-page .ghost-link {
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .orders-page .toolbar-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .orders-page .toolbar-controls input,
+  .orders-page .toolbar-controls select {
+    width: 100%;
+    min-width: 0;
   }
 
   .order-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     position: relative;
     padding-left: 36px;
+  }
+
+  .order-card .row-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .order-card .row-actions select,
+  .order-card .row-actions button {
+    width: 100%;
+    min-width: 0;
   }
 
   .order-card .status-dot {
@@ -1663,18 +1727,57 @@ button.review-summary {
   }
 
   .orders-page .status-filter-row {
-    margin-left: -12px;
-    margin-right: -12px;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
     padding-left: 12px;
+    padding-right: 12px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
   }
 
   .detail-panel .panel-head select {
     width: 100%;
+    min-width: 0;
+  }
+
+  .detail-panel .panel-head {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .order-quick-actions,
+  .order-contact-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .order-quick-actions button,
+  .order-contact-actions button,
+  .order-contact-actions .ghost-link {
+    width: 100%;
+    min-width: 0;
   }
 
   .order-product {
     display: grid;
     grid-template-columns: 52px minmax(0, 1fr);
+    align-items: start;
+    width: 100%;
+  }
+
+  .order-product img,
+  .order-product .empty-thumb {
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+  }
+
+  .order-product strong,
+  .order-product p,
+  .order-product span {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .order-product > span {
