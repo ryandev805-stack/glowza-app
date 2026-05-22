@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { CheckCircle2, PlayCircle, RefreshCcw, Search, Sparkles, UploadCloud } from 'lucide-react';
+import { CheckCircle2, FileText, Link2, ListChecks, PlayCircle, RefreshCcw, Search, Sparkles, UploadCloud } from 'lucide-react';
 import { importImageUrlToCloudinary, importMediaUrlToCloudinary } from '../services/cloudinaryService';
 import { listCategories, listProducts, saveProduct } from '../services/firestoreService';
 import { scanWinningProducts } from '../services/winningProductService';
@@ -12,6 +12,13 @@ function money(value: number | undefined) {
   return `PKR ${Number(value || 0).toLocaleString('en-PK')}`;
 }
 
+function parseProductUrls(value: string) {
+  return [...new Set(
+    [...value.matchAll(/https:\/\/www\.markaz\.app\/shop\/product\/[^\s"',\]]+/gi)]
+      .map((match) => match[0].replace(/[),.;]+$/, '')),
+  )];
+}
+
 export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }) {
   const categories = useCollection<Category>(useCallback(() => listCategories(), []));
   const products = useCollection<Product>(useCallback(() => listProducts(), []));
@@ -21,6 +28,7 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
   const [maxProducts, setMaxProducts] = useState(12);
   const [minPrice, setMinPrice] = useState(200);
   const [maxPrice, setMaxPrice] = useState(5000);
+  const [bulkUrlsText, setBulkUrlsText] = useState('');
   const [candidates, setCandidates] = useState<WinningProductCandidate[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -38,6 +46,17 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
     [products.items],
   );
   const selected = candidates.filter((candidate) => selectedIds.has(candidate.id));
+  const parsedBulkUrls = useMemo(() => parseProductUrls(bulkUrlsText), [bulkUrlsText]);
+
+  function applyCandidates(result: WinningProductCandidate[], autoScore = true) {
+    const withDuplicates = result.map((candidate) => ({
+      ...candidate,
+      duplicate: existingSources.has(`${candidate.sourceUrl}::${candidate.markazVariationId || ''}`),
+    }));
+    setCandidates(withDuplicates);
+    setSelectedIds(new Set(withDuplicates.filter((item) => !item.duplicate && (!autoScore || item.winningScore >= 55)).map((item) => item.id)));
+    return withDuplicates;
+  }
 
   async function scan() {
     setLoading(true);
@@ -50,12 +69,7 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
         minPrice,
         maxPrice,
       });
-      const withDuplicates = result.map((candidate) => ({
-        ...candidate,
-        duplicate: existingSources.has(`${candidate.sourceUrl}::${candidate.markazVariationId || ''}`),
-      }));
-      setCandidates(withDuplicates);
-      setSelectedIds(new Set(withDuplicates.filter((item) => !item.duplicate && item.winningScore >= 55).map((item) => item.id)));
+      const withDuplicates = applyCandidates(result);
       setMessage(`Found ${withDuplicates.length} candidate product${withDuplicates.length === 1 ? '' : 's'}.`);
     } catch (scanError) {
       setError(scanError instanceof Error ? scanError.message : 'Could not scan Markaz category.');
@@ -76,18 +90,44 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
         minPrice,
         maxPrice,
       });
-      const withDuplicates = result.map((candidate) => ({
-        ...candidate,
-        duplicate: existingSources.has(`${candidate.sourceUrl}::${candidate.markazVariationId || ''}`),
-      }));
-      setCandidates(withDuplicates);
-      setSelectedIds(new Set(withDuplicates.filter((item) => !item.duplicate).map((item) => item.id)));
+      const withDuplicates = applyCandidates(result, false);
       setMessage(`Fetched ${withDuplicates.length} product draft${withDuplicates.length === 1 ? '' : 's'} from this Markaz URL.`);
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : 'Could not fetch Markaz product.');
     } finally {
       setLoading(false);
     }
+  }
+
+  async function fetchBulkUrls() {
+    if (parsedBulkUrls.length === 0) {
+      setError('Paste or upload product_urls.txt with valid Markaz product URLs first.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await scanWinningProducts({
+        categoryUrl,
+        productUrls: parsedBulkUrls,
+        maxProducts: parsedBulkUrls.length,
+        minPrice,
+        maxPrice,
+      });
+      const withDuplicates = applyCandidates(result, false);
+      setMessage(`Fetched ${withDuplicates.length} product draft${withDuplicates.length === 1 ? '' : 's'} from ${parsedBulkUrls.length} URL${parsedBulkUrls.length === 1 ? '' : 's'}.`);
+    } catch (fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : 'Could not fetch Markaz product URLs.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function uploadUrlsFile(file: File | undefined) {
+    if (!file) return;
+    const text = await file.text();
+    setBulkUrlsText(text);
   }
 
   function toggle(candidate: WinningProductCandidate) {
@@ -181,22 +221,22 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
         <div>
           <span className="eyebrow">Automation</span>
           <h1>Winning Products</h1>
-          <p>Scan Markaz category pages, score product opportunities, and import selected products as inactive drafts for review.</p>
+          <p>Scan Markaz pages or import scraped URL lists, fetch full product details, then save selected products as inactive drafts for review.</p>
         </div>
-        <button disabled={loading} onClick={() => void scan()}><Search size={17} /> {loading ? 'Scanning...' : 'Find Winning Products'}</button>
+        <button disabled={importing || selected.length === 0} onClick={() => void importSelected()}>
+          <UploadCloud size={17} /> {importing ? 'Importing...' : `Import ${selected.length || ''} Selected`}
+        </button>
       </div>
 
-      <section className="panel product-editor-pro">
+      <section className="panel winning-control-panel">
         <div className="panel-head">
           <div>
-            <h2>Scanner Settings</h2>
-            <p>Pricing rule: margin is applied by Markaz price range, then cut price is calculated for a 40% display discount.</p>
+            <h2>Import Settings</h2>
+            <p>Choose the Glowza category and pricing range once, then use any product source below.</p>
           </div>
           <button className="ghost" onClick={() => void products.refresh()}><RefreshCcw size={17} /> Refresh Products</button>
         </div>
-        <div className="form-grid">
-          <label>Markaz Category URL<input value={categoryUrl} onChange={(event) => setCategoryUrl(event.target.value)} /></label>
-          <label>Single Markaz Product URL<input placeholder="https://www.markaz.app/shop/product/..." value={productUrl} onChange={(event) => setProductUrl(event.target.value)} /></label>
+        <div className="form-grid compact-form-grid">
           <label>
             Glowza Category
             <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
@@ -208,10 +248,56 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
           <label>Min Markaz Price<input type="number" min="0" value={minPrice} onChange={(event) => setMinPrice(Number(event.target.value))} /></label>
           <label>Max Markaz Price<input type="number" min="0" value={maxPrice} onChange={(event) => setMaxPrice(Number(event.target.value))} /></label>
         </div>
-        <div className="actions">
-          <button className="ghost" disabled={loading || !productUrl.trim()} onClick={() => void fetchSingleProduct()}>
-            <Search size={17} /> {loading ? 'Fetching...' : 'Fetch Single Product'}
-          </button>
+        <div className="automation-source-grid">
+          <article className="automation-source-card">
+            <div className="source-icon"><Search size={19} /></div>
+            <div>
+              <h3>Scan Listing or Search URL</h3>
+              <p>Use Markaz category, shop, or search URLs to discover product links.</p>
+            </div>
+            <label>Markaz URL<input value={categoryUrl} onChange={(event) => setCategoryUrl(event.target.value)} /></label>
+            <button disabled={loading} onClick={() => void scan()}><Search size={17} /> {loading ? 'Scanning...' : 'Scan URL'}</button>
+          </article>
+
+          <article className="automation-source-card">
+            <div className="source-icon"><Link2 size={19} /></div>
+            <div>
+              <h3>Fetch Single Product</h3>
+              <p>Paste one Markaz detail URL and fetch all product fields.</p>
+            </div>
+            <label>Product URL<input placeholder="https://www.markaz.app/shop/product/..." value={productUrl} onChange={(event) => setProductUrl(event.target.value)} /></label>
+            <button className="ghost" disabled={loading || !productUrl.trim()} onClick={() => void fetchSingleProduct()}>
+              <Search size={17} /> {loading ? 'Fetching...' : 'Fetch Product'}
+            </button>
+          </article>
+
+          <article className="automation-source-card bulk-url-card">
+            <div className="source-icon"><FileText size={19} /></div>
+            <div>
+              <h3>Import product_urls.txt</h3>
+              <p>Paste URLs or upload the scraper file. Admin will fetch every product URL listed.</p>
+            </div>
+            <label className="file-drop">
+              <input type="file" accept=".txt,.json" onChange={(event) => void uploadUrlsFile(event.target.files?.[0])} />
+              <FileText size={18} />
+              Upload product_urls.txt
+            </label>
+            <label>
+              Product URLs
+              <textarea
+                rows={7}
+                placeholder="https://www.markaz.app/shop/product/product-name/123456"
+                value={bulkUrlsText}
+                onChange={(event) => setBulkUrlsText(event.target.value)}
+              />
+            </label>
+            <div className="source-footer">
+              <span><ListChecks size={15} /> {parsedBulkUrls.length} valid URLs</span>
+              <button disabled={loading || parsedBulkUrls.length === 0} onClick={() => void fetchBulkUrls()}>
+                <UploadCloud size={17} /> {loading ? 'Fetching...' : 'Fetch URL List'}
+              </button>
+            </div>
+          </article>
         </div>
         {message && <p className="success">{message}</p>}
         {error && <p className="error">{error}</p>}
@@ -224,6 +310,9 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
             <p>{selected.length} selected from {candidates.length} scanned products</p>
           </div>
           <div className="toolbar-controls">
+            <button className="ghost" disabled={candidates.length === 0} onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </button>
             <button className="ghost" disabled={candidates.length === 0} onClick={() => setSelectedIds(new Set(candidates.filter((candidate) => !candidate.duplicate).map((candidate) => candidate.id)))}>
               Select All
             </button>
@@ -274,7 +363,7 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
               </div>
             </article>
           ))}
-          {candidates.length === 0 && <p className="muted">Paste the Markaz Skin Care category URL and scan to find products.</p>}
+          {candidates.length === 0 && <p className="muted">Scan a Markaz URL, fetch one product, or import product_urls.txt to prepare draft products.</p>}
         </div>
       </section>
     </section>

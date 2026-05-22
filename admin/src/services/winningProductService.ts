@@ -3,6 +3,7 @@ import type { WinningProductCandidate } from '../types';
 export type WinningProductScanInput = {
   categoryUrl: string;
   productUrl?: string;
+  productUrls?: string[];
   maxProducts: number;
   minPrice: number;
   maxPrice: number;

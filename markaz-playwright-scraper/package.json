@@ -1,0 +1,13 @@
+{
+  "name": "markaz-playwright-scraper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright scraper for collecting Markaz product URLs and RSC payloads.",
+  "main": "scraper.js",
+  "scripts": {
+    "start": "node scraper.js"
+  },
+  "dependencies": {
+    "playwright": "^1.49.1"
+  }
+}

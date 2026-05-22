@@ -586,6 +586,24 @@ function scoreProduct(product, minPrice, maxPrice) {
   return { winningScore: Math.max(0, Math.min(100, score)), reasons };
 }
 
+function toCandidateProducts(products, minPrice, maxPrice) {
+  return products
+    .flatMap(expandVariationProducts)
+    .filter((product) => product.name && product.markazPrice > 0)
+    .map((product, index) => {
+      const pricing = buildPricing(product.markazPrice);
+      const scoring = scoreProduct(product, Number(minPrice) || 0, Number(maxPrice) || 999999);
+      return {
+        id: `${Date.now()}-${index}`,
+        ...product,
+        ...pricing,
+        ...scoring,
+        duplicate: false,
+      };
+    })
+    .sort((a, b) => b.winningScore - a.winningScore);
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -595,29 +613,45 @@ export default async function handler(req, res) {
   const {
     categoryUrl,
     productUrl,
+    productUrls = [],
     maxProducts = 12,
     minPrice = 200,
     maxPrice = 5000,
   } = req.body || {};
 
   const normalizedProductUrl = normalizeMarkazProductUrl(productUrl);
+  const normalizedProductUrls = Array.isArray(productUrls)
+    ? unique(productUrls.map(normalizeMarkazProductUrl).filter(Boolean)).slice(0, 200)
+    : [];
+
+  if (normalizedProductUrls.length > 0) {
+    try {
+      const settled = await mapWithConcurrency(normalizedProductUrls, 4, scrapeProductDetail);
+      const failedCount = settled.filter((result) => result.status === 'rejected').length;
+      const products = toCandidateProducts(
+        settled.filter((result) => result.status === 'fulfilled').map((result) => result.value),
+        minPrice,
+        maxPrice,
+      );
+
+      res.status(200).json({
+        products,
+        sourceCount: normalizedProductUrls.length,
+        detailFetchedCount: products.length,
+        failedCount,
+        scannedPages: [],
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: error instanceof Error ? error.message : 'Could not fetch Markaz product URLs',
+      });
+    }
+    return;
+  }
 
   if (normalizedProductUrl) {
     try {
-      const products = expandVariationProducts(await scrapeProductDetail(normalizedProductUrl))
-        .filter((product) => product.name && product.markazPrice > 0)
-        .map((product, index) => {
-          const pricing = buildPricing(product.markazPrice);
-          const scoring = scoreProduct(product, Number(minPrice) || 0, Number(maxPrice) || 999999);
-          return {
-            id: `${Date.now()}-${index}`,
-            ...product,
-            ...pricing,
-            ...scoring,
-            duplicate: false,
-          };
-        })
-        .sort((a, b) => b.winningScore - a.winningScore);
+      const products = toCandidateProducts([await scrapeProductDetail(normalizedProductUrl)], minPrice, maxPrice);
 
       res.status(200).json({
         products,
@@ -653,24 +687,11 @@ export default async function handler(req, res) {
 
     const settled = await mapWithConcurrency(urls, 4, scrapeProductDetail);
     const failedCount = settled.filter((result) => result.status === 'rejected').length;
-    const products = settled
-      .filter((result) => result.status === 'fulfilled')
-      .map((result) => result.value)
-      .flatMap(expandVariationProducts)
-      .filter((product) => product.name && product.markazPrice > 0)
-      .map((product, index) => {
-        const pricing = buildPricing(product.markazPrice);
-        const scoring = scoreProduct(product, Number(minPrice) || 0, Number(maxPrice) || 999999);
-        return {
-          id: `${Date.now()}-${index}`,
-          ...product,
-          ...pricing,
-          ...scoring,
-          duplicate: false,
-        };
-      })
-      .sort((a, b) => b.winningScore - a.winningScore)
-      .slice(0, limit);
+    const products = toCandidateProducts(
+      settled.filter((result) => result.status === 'fulfilled').map((result) => result.value),
+      minPrice,
+      maxPrice,
+    ).slice(0, limit);
 
     res.status(200).json({
       products,
