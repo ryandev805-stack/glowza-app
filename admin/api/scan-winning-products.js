@@ -71,25 +71,36 @@ function withPage(url, page) {
   return nextUrl.toString();
 }
 
+function pageFromUrl(url) {
+  try {
+    const page = Number(new URL(url).searchParams.get('page') || 1);
+    return Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  } catch {
+    return 1;
+  }
+}
+
 async function collectProductUrls(categoryUrl, limit) {
   const urls = [];
   const seen = new Set();
   const pages = [];
   const maxPages = 8;
-  const targetUrlCount = Math.min(limit * 3, 60);
-  const renderedPageSize = 30;
+  const targetUrlCount = Math.min(limit * 3, 72);
+  const renderedPageSize = 72;
+  const startPage = pageFromUrl(categoryUrl);
   let firstPageSignature = '';
 
-  for (let page = 1; page <= maxPages && urls.length < targetUrlCount; page += 1) {
+  for (let page = startPage; page < startPage + maxPages && urls.length < targetUrlCount; page += 1) {
     const pageUrl = withPage(categoryUrl, page);
     const html = await fetchHtml(pageUrl);
     const pageUrls = extractProductUrls(html, pageUrl);
-    if (page === 1) {
+    if (page === startPage) {
       firstPageSignature = pageUrls.slice(0, 8).join('|');
     }
     const currentSignature = pageUrls.slice(0, 8).join('|');
-    const htmlIsSamePaginatedSource = page > 1 && firstPageSignature && currentSignature === firstPageSignature;
-    const visibleUrls = htmlIsSamePaginatedSource
+    const htmlIsSamePaginatedSource = page > startPage && firstPageSignature && currentSignature === firstPageSignature;
+    const hasEmbeddedFullCategory = pageUrls.length > renderedPageSize;
+    const visibleUrls = hasEmbeddedFullCategory || htmlIsSamePaginatedSource
       ? pageUrls.slice((page - 1) * renderedPageSize, page * renderedPageSize)
       : pageUrls;
     pages.push({
@@ -97,7 +108,7 @@ async function collectProductUrls(categoryUrl, limit) {
       url: pageUrl,
       count: visibleUrls.length,
       sourceCount: pageUrls.length,
-      mode: htmlIsSamePaginatedSource ? 'sliced-html' : 'page-html',
+      mode: hasEmbeddedFullCategory || htmlIsSamePaginatedSource ? 'sliced-html' : 'page-html',
     });
 
     visibleUrls.forEach((url) => {
