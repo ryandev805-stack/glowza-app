@@ -77,20 +77,36 @@ async function collectProductUrls(categoryUrl, limit) {
   const pages = [];
   const maxPages = 8;
   const targetUrlCount = Math.min(limit * 3, 60);
+  const renderedPageSize = 30;
+  let firstPageSignature = '';
 
   for (let page = 1; page <= maxPages && urls.length < targetUrlCount; page += 1) {
     const pageUrl = withPage(categoryUrl, page);
     const html = await fetchHtml(pageUrl);
     const pageUrls = extractProductUrls(html, pageUrl);
-    pages.push({ page, url: pageUrl, count: pageUrls.length });
+    if (page === 1) {
+      firstPageSignature = pageUrls.slice(0, 8).join('|');
+    }
+    const currentSignature = pageUrls.slice(0, 8).join('|');
+    const htmlIsSamePaginatedSource = page > 1 && firstPageSignature && currentSignature === firstPageSignature;
+    const visibleUrls = htmlIsSamePaginatedSource
+      ? pageUrls.slice((page - 1) * renderedPageSize, page * renderedPageSize)
+      : pageUrls;
+    pages.push({
+      page,
+      url: pageUrl,
+      count: visibleUrls.length,
+      sourceCount: pageUrls.length,
+      mode: htmlIsSamePaginatedSource ? 'sliced-html' : 'page-html',
+    });
 
-    pageUrls.forEach((url) => {
+    visibleUrls.forEach((url) => {
       if (urls.length >= targetUrlCount || seen.has(url)) return;
       seen.add(url);
       urls.push(url);
     });
 
-    if (pageUrls.length === 0 && page > 1) break;
+    if (visibleUrls.length === 0 && page > 1) break;
   }
 
   return { urls, pages };
