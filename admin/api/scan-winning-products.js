@@ -457,13 +457,48 @@ export default async function handler(req, res) {
 
   const {
     categoryUrl,
+    productUrl,
     maxProducts = 12,
     minPrice = 200,
     maxPrice = 5000,
   } = req.body || {};
 
+  const normalizedProductUrl = normalizeMarkazProductUrl(productUrl);
+
+  if (normalizedProductUrl) {
+    try {
+      const products = expandVariationProducts(await scrapeProductDetail(normalizedProductUrl))
+        .filter((product) => product.name && product.markazPrice > 0)
+        .map((product, index) => {
+          const pricing = buildPricing(product.markazPrice);
+          const scoring = scoreProduct(product, Number(minPrice) || 0, Number(maxPrice) || 999999);
+          return {
+            id: `${Date.now()}-${index}`,
+            ...product,
+            ...pricing,
+            ...scoring,
+            duplicate: false,
+          };
+        })
+        .sort((a, b) => b.winningScore - a.winningScore);
+
+      res.status(200).json({
+        products,
+        sourceCount: 1,
+        detailFetchedCount: products.length,
+        failedCount: 0,
+        scannedPages: [],
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: error instanceof Error ? error.message : 'Could not fetch Markaz product',
+      });
+    }
+    return;
+  }
+
   if (!categoryUrl || !/^https:\/\/www\.markaz\.app\//i.test(categoryUrl)) {
-    res.status(400).json({ error: 'Valid Markaz category URL is required' });
+    res.status(400).json({ error: 'Valid Markaz category URL or product URL is required' });
     return;
   }
 

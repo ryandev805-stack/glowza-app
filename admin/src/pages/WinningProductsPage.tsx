@@ -16,6 +16,7 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
   const categories = useCollection<Category>(useCallback(() => listCategories(), []));
   const products = useCollection<Product>(useCallback(() => listProducts(), []));
   const [categoryUrl, setCategoryUrl] = useState(defaultUrl);
+  const [productUrl, setProductUrl] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [maxProducts, setMaxProducts] = useState(12);
   const [minPrice, setMinPrice] = useState(200);
@@ -28,7 +29,12 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
   const [error, setError] = useState('');
 
   const existingSources = useMemo(
-    () => new Set(products.items.map((product) => product.sourceUrl).filter(Boolean)),
+    () =>
+      new Set(
+        products.items
+          .filter((product) => product.sourceUrl)
+          .map((product) => `${product.sourceUrl}::${product.markazVariationId || ''}`),
+      ),
     [products.items],
   );
   const selected = candidates.filter((candidate) => selectedIds.has(candidate.id));
@@ -46,13 +52,39 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
       });
       const withDuplicates = result.map((candidate) => ({
         ...candidate,
-        duplicate: existingSources.has(candidate.sourceUrl),
+        duplicate: existingSources.has(`${candidate.sourceUrl}::${candidate.markazVariationId || ''}`),
       }));
       setCandidates(withDuplicates);
       setSelectedIds(new Set(withDuplicates.filter((item) => !item.duplicate && item.winningScore >= 55).map((item) => item.id)));
       setMessage(`Found ${withDuplicates.length} candidate product${withDuplicates.length === 1 ? '' : 's'}.`);
     } catch (scanError) {
       setError(scanError instanceof Error ? scanError.message : 'Could not scan Markaz category.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function fetchSingleProduct() {
+    setLoading(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await scanWinningProducts({
+        categoryUrl,
+        productUrl,
+        maxProducts: 1,
+        minPrice,
+        maxPrice,
+      });
+      const withDuplicates = result.map((candidate) => ({
+        ...candidate,
+        duplicate: existingSources.has(`${candidate.sourceUrl}::${candidate.markazVariationId || ''}`),
+      }));
+      setCandidates(withDuplicates);
+      setSelectedIds(new Set(withDuplicates.filter((item) => !item.duplicate).map((item) => item.id)));
+      setMessage(`Fetched ${withDuplicates.length} product draft${withDuplicates.length === 1 ? '' : 's'} from this Markaz URL.`);
+    } catch (fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : 'Could not fetch Markaz product.');
     } finally {
       setLoading(false);
     }
@@ -164,6 +196,7 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
         </div>
         <div className="form-grid">
           <label>Markaz Category URL<input value={categoryUrl} onChange={(event) => setCategoryUrl(event.target.value)} /></label>
+          <label>Single Markaz Product URL<input placeholder="https://www.markaz.app/shop/product/..." value={productUrl} onChange={(event) => setProductUrl(event.target.value)} /></label>
           <label>
             Glowza Category
             <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
@@ -174,6 +207,11 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
           <label>Max Products<input type="number" min="1" max="30" value={maxProducts} onChange={(event) => setMaxProducts(Number(event.target.value))} /></label>
           <label>Min Markaz Price<input type="number" min="0" value={minPrice} onChange={(event) => setMinPrice(Number(event.target.value))} /></label>
           <label>Max Markaz Price<input type="number" min="0" value={maxPrice} onChange={(event) => setMaxPrice(Number(event.target.value))} /></label>
+        </div>
+        <div className="actions">
+          <button className="ghost" disabled={loading || !productUrl.trim()} onClick={() => void fetchSingleProduct()}>
+            <Search size={17} /> {loading ? 'Fetching...' : 'Fetch Single Product'}
+          </button>
         </div>
         {message && <p className="success">{message}</p>}
         {error && <p className="error">{error}</p>}
