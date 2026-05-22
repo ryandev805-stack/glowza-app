@@ -70,7 +70,66 @@ function productIdFromUrl(url) {
   return match?.[1] || '';
 }
 
+function isMarkazSearchUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === 'www.markaz.app' && parsed.pathname === '/shop/search';
+  } catch {
+    return false;
+  }
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url, {
+    headers: {
+      'user-agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+      accept: 'application/json,text/plain,*/*',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Could not fetch ${url} (${response.status})`);
+  }
+  return response.json();
+}
+
+async function collectSearchProductUrls(searchUrl, limit) {
+  const parsed = new URL(searchUrl);
+  const query = parsed.searchParams.get('q')?.trim() || '';
+  const page = Math.max(1, Math.floor(Number(parsed.searchParams.get('page') || 1)) || 1);
+  if (!query) return { urls: [], pages: [{ page, url: searchUrl, count: 0, sourceCount: 0, mode: 'search-api' }] };
+
+  const targetUrlCount = Math.min(limit * 3, 72);
+  const apiUrl = `https://apiv2.markaz.app/marketplace/products/search/v4/${page}/null/${encodeURIComponent(query)}`;
+  const payload = await fetchJson(apiUrl);
+  const products = Array.isArray(payload) ? payload : Array.isArray(payload?.products) ? payload.products : [];
+  const urls = unique(
+    products
+      .map((item) => {
+        const id = item?.id;
+        const name = item?.name;
+        return id && name ? `https://www.markaz.app/shop/product/${slugify(name)}/${id}` : '';
+      })
+      .filter(Boolean),
+  ).slice(0, targetUrlCount);
+
+  return {
+    urls,
+    pages: [{
+      page,
+      url: searchUrl,
+      count: urls.length,
+      sourceCount: products.length,
+      mode: 'search-api',
+    }],
+  };
+}
+
 async function collectProductUrls(categoryUrl, limit) {
+  if (isMarkazSearchUrl(categoryUrl)) {
+    return collectSearchProductUrls(categoryUrl, limit);
+  }
+
   const urls = [];
   const seen = new Set();
   const pages = [];
@@ -586,7 +645,7 @@ export default async function handler(req, res) {
     if (urls.length === 0) {
       res.status(422).json({
         error:
-          'No product detail links were found after checking Markaz paginated category pages.',
+          'No product detail links were found for the provided Markaz URL.',
         scannedPages: pages,
       });
       return;
