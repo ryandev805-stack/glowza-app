@@ -65,6 +65,11 @@ function normalizeMarkazProductUrl(url) {
   return clean;
 }
 
+function productIdFromUrl(url) {
+  const match = normalizeMarkazProductUrl(url).match(/\/(\d+)$/);
+  return match?.[1] || '';
+}
+
 function withPage(url, page) {
   const nextUrl = new URL(url);
   nextUrl.searchParams.set('page', String(page));
@@ -183,19 +188,99 @@ function parseJsonLd(html) {
   return null;
 }
 
-function extractImages(decoded, jsonLd) {
+function readObjectAt(source, start) {
+  if (start < 0 || source[start] !== '{') return '';
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') inString = !inString;
+    if (inString) continue;
+    if (char === '{') depth += 1;
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  return '';
+}
+
+function findObjectContainingIndex(source, index) {
+  let cursor = index;
+  for (let attempts = 0; attempts < 80 && cursor >= 0; attempts += 1) {
+    cursor = source.lastIndexOf('{', cursor - 1);
+    if (cursor < 0) break;
+    const objectText = readObjectAt(source, cursor);
+    if (objectText && cursor <= index && cursor + objectText.length >= index) {
+      return objectText;
+    }
+  }
+  return '';
+}
+
+function extractCurrentProductJson(decoded, sourceUrl) {
+  const productId = productIdFromUrl(sourceUrl);
+  if (!productId) return '';
+  const patterns = [`"id":${productId}`, `"id":"${productId}"`];
+  for (const pattern of patterns) {
+    let index = decoded.indexOf(pattern);
+    while (index >= 0) {
+      const objectText = findObjectContainingIndex(decoded, index);
+      if (
+        objectText &&
+        /"name"|"title"/.test(objectText) &&
+        /"image"|"images"|"media"|"prePaidPrice"|"price"/.test(objectText)
+      ) {
+        return objectText;
+      }
+      index = decoded.indexOf(pattern, index + pattern.length);
+    }
+  }
+  return '';
+}
+
+function extractImageUrlsFromText(text) {
+  if (!text) return [];
+  const keyedImages = [...text.matchAll(/"(?:image|images|imageUrl|imageURL|thumbnail|thumbnailUrl|url|original|large|medium|small)":"(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp|avif)(?:\?[^"]*)?)"/gi)].map((match) => match[1]);
+  const allImages = [...text.matchAll(/https?:\/\/[^"'\\\s<]+\.(?:jpg|jpeg|png|webp|avif)(?:\?[^"'\\\s<]*)?/gi)].map((match) => match[0]);
+  return unique([...keyedImages, ...allImages]).filter((url) => !/favicon|logo|sprite/i.test(url));
+}
+
+function extractVideoUrlsFromText(text) {
+  if (!text) return [];
+  const keyedVideos = [...text.matchAll(/"(?:video|videos|videoUrl|videoURL|contentUrl|embedUrl|url)":"(https?:\/\/[^"]+\.(?:mp4|webm|mov|m3u8)(?:\?[^"]*)?)"/gi)].map((match) => match[1]);
+  const allVideos = [...text.matchAll(/https?:\/\/[^"'\\\s<]+\.(?:mp4|webm|mov|m3u8)(?:\?[^"'\\\s<]*)?/gi)].map((match) => match[0]);
+  return unique([...keyedVideos, ...allVideos]).filter((url) => /^https?:\/\//i.test(url));
+}
+
+function extractImages(decoded, jsonLd, sourceUrl) {
+  const productJson = extractCurrentProductJson(decoded, sourceUrl);
+  const productImages = extractImageUrlsFromText(productJson);
+  if (productImages.length) return productImages.slice(0, 16);
+
   const jsonLdImages = Array.isArray(jsonLd?.image)
     ? jsonLd.image.map(firstImage)
     : [firstImage(jsonLd?.image)];
   const ogImages = [...decoded.matchAll(/(?:property|name)=["']og:image["'][^>]+content=["']([^"']+)["']/gi)].map((match) => match[1]);
-  const imageKeys = [...decoded.matchAll(/"(?:image|imageUrl|thumbnail|thumbnailUrl|url)":"(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp|avif)(?:\?[^"]*)?)"/gi)].map((match) => match[1]);
-  const anyImages = [...decoded.matchAll(/https?:\/\/[^"'\\\s<]+\.(?:jpg|jpeg|png|webp|avif)(?:\?[^"'\\\s<]*)?/gi)].map((match) => match[0]);
-  return unique([...jsonLdImages, ...ogImages, ...imageKeys, ...anyImages])
+  return unique([...jsonLdImages, ...ogImages])
     .filter((url) => !/favicon|logo|sprite/i.test(url))
     .slice(0, 16);
 }
 
-function extractVideos(decoded) {
+function extractVideos(decoded, sourceUrl) {
+  const productJson = extractCurrentProductJson(decoded, sourceUrl);
+  const productVideos = extractVideoUrlsFromText(productJson);
+  if (productVideos.length) return productVideos.slice(0, 8);
+
   const videoKeys = [...decoded.matchAll(/"(?:video|videoUrl|videoURL|contentUrl|embedUrl)":"(https?:\/\/[^"]+)"/gi)].map((match) => match[1]);
   const videoTags = [...decoded.matchAll(/<video[^>]+src=["']([^"']+)["']/gi)].map((match) => match[1]);
   const sourceTags = [...decoded.matchAll(/<source[^>]+src=["']([^"']+)["']/gi)].map((match) => match[1]);
@@ -304,8 +389,8 @@ function extractDetailProduct(html, sourceUrl) {
     formatDescription(textBetween(decoded, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["'][^>]*>/i)) ||
     formatDescription(textBetween(decoded, /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["'][^>]*>/i));
 
-  const images = extractImages(decoded, jsonLd);
-  const videos = extractVideos(decoded);
+  const images = extractImages(decoded, jsonLd, sourceUrl);
+  const videos = extractVideos(decoded, sourceUrl);
   const brand = typeof jsonLd?.brand === 'object' ? jsonLd.brand.name : jsonLd?.brand;
   const markazPrice =
     variation.prePaidPrice ||
