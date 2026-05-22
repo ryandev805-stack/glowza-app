@@ -70,60 +70,26 @@ function productIdFromUrl(url) {
   return match?.[1] || '';
 }
 
-function withPage(url, page) {
-  const nextUrl = new URL(url);
-  nextUrl.searchParams.set('page', String(page));
-  return nextUrl.toString();
-}
-
-function pageFromUrl(url) {
-  try {
-    const page = Number(new URL(url).searchParams.get('page') || 1);
-    return Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
-  } catch {
-    return 1;
-  }
-}
-
 async function collectProductUrls(categoryUrl, limit) {
   const urls = [];
   const seen = new Set();
   const pages = [];
-  const maxPages = 8;
   const targetUrlCount = Math.min(limit * 3, 72);
-  const renderedPageSize = 72;
-  const startPage = pageFromUrl(categoryUrl);
-  let firstPageSignature = '';
+  const html = await fetchHtml(categoryUrl);
+  const pageUrls = extractProductUrls(html, categoryUrl);
+  pages.push({
+    page: 1,
+    url: categoryUrl,
+    count: Math.min(pageUrls.length, targetUrlCount),
+    sourceCount: pageUrls.length,
+    mode: 'exact-url',
+  });
 
-  for (let page = startPage; page < startPage + maxPages && urls.length < targetUrlCount; page += 1) {
-    const pageUrl = withPage(categoryUrl, page);
-    const html = await fetchHtml(pageUrl);
-    const pageUrls = extractProductUrls(html, pageUrl);
-    if (page === startPage) {
-      firstPageSignature = pageUrls.slice(0, 8).join('|');
-    }
-    const currentSignature = pageUrls.slice(0, 8).join('|');
-    const htmlIsSamePaginatedSource = page > startPage && firstPageSignature && currentSignature === firstPageSignature;
-    const hasEmbeddedFullCategory = pageUrls.length > renderedPageSize;
-    const visibleUrls = hasEmbeddedFullCategory || htmlIsSamePaginatedSource
-      ? pageUrls.slice((page - 1) * renderedPageSize, page * renderedPageSize)
-      : pageUrls;
-    pages.push({
-      page,
-      url: pageUrl,
-      count: visibleUrls.length,
-      sourceCount: pageUrls.length,
-      mode: hasEmbeddedFullCategory || htmlIsSamePaginatedSource ? 'sliced-html' : 'page-html',
-    });
-
-    visibleUrls.forEach((url) => {
-      if (urls.length >= targetUrlCount || seen.has(url)) return;
-      seen.add(url);
-      urls.push(url);
-    });
-
-    if (visibleUrls.length === 0 && page > 1) break;
-  }
+  pageUrls.forEach((url) => {
+    if (urls.length >= targetUrlCount || seen.has(url)) return;
+    seen.add(url);
+    urls.push(url);
+  });
 
   return { urls, pages };
 }
