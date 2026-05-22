@@ -1084,6 +1084,18 @@ button.review-summary {
   gap: 14px;
 }
 
+@media (min-width: 1120px) {
+  .orders-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
+    align-items: start;
+  }
+
+  .orders-layout .detail-panel {
+    position: sticky;
+    top: 96px;
+  }
+}
+
 .status-filter-row {
   display: flex;
   gap: 8px;
@@ -1121,6 +1133,14 @@ button.review-summary {
   align-items: flex-start;
 }
 
+.order-card .row-actions {
+  align-items: center;
+}
+
+.order-card .row-actions select {
+  min-width: 140px;
+}
+
 .order-quick-actions,
 .order-contact-actions {
   display: flex;
@@ -1134,6 +1154,13 @@ button.review-summary {
   display: grid;
   gap: 10px;
   margin: 14px 0;
+}
+
+@media (min-width: 720px) {
+  .detail-grid,
+  .totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .detail-grid div,
@@ -1617,6 +1644,42 @@ button.review-summary {
   .detail-grid,
   .totals {
     gap: 8px;
+    grid-template-columns: 1fr;
+  }
+
+  .orders-page .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .order-card {
+    position: relative;
+    padding-left: 36px;
+  }
+
+  .order-card .status-dot {
+    position: absolute;
+    left: 12px;
+    top: 14px;
+  }
+
+  .orders-page .status-filter-row {
+    margin-left: -12px;
+    margin-right: -12px;
+    padding-left: 12px;
+  }
+
+  .detail-panel .panel-head select {
+    width: 100%;
+  }
+
+  .order-product {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .order-product > span {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .pagination {

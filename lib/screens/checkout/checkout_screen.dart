@@ -18,6 +18,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   late final TextEditingController _address;
   late final TextEditingController _city;
   late final TextEditingController _area;
+  late final TextEditingController _nearbyPlace;
   late final TextEditingController _phone;
   bool _saveInfo = true;
   bool _useGameDiscount = false;
@@ -35,6 +36,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _address = TextEditingController(text: saved.fullAddress);
     _city = TextEditingController(text: saved.city);
     _area = TextEditingController(text: saved.area);
+    _nearbyPlace = TextEditingController(text: saved.nearbyPlace);
     _phone = TextEditingController(
       text: saved.phoneNumber.isNotEmpty
           ? saved.phoneNumber
@@ -48,6 +50,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _address.dispose();
     _city.dispose();
     _area.dispose();
+    _nearbyPlace.dispose();
     _phone.dispose();
     super.dispose();
   }
@@ -75,6 +78,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             _field(_city, 'City', Icons.location_city_outlined),
             _field(_area, 'Area', Icons.map_outlined),
+            _field(
+              _nearbyPlace,
+              'Famous place near your location',
+              Icons.place_outlined,
+            ),
             _field(
               _phone,
               'Phone Number',
@@ -118,6 +126,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         fullAddress: _address.text.trim(),
                         city: _city.text.trim(),
                         area: _area.text.trim(),
+                        nearbyPlace: _nearbyPlace.text.trim(),
                         phoneNumber: _phone.text.trim(),
                       );
                       if (_saveInfo) {

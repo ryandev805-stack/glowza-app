@@ -768,6 +768,7 @@ class _DeliverySheetState extends State<_DeliverySheet> {
         fullAddress: _address.text.trim(),
         city: _city.text.trim(),
         area: _area.text.trim(),
+        nearbyPlace: widget.info.nearbyPlace,
         phoneNumber: _phone.text.trim(),
       ),
     );
@@ -816,6 +817,12 @@ Future<void> _showOrderDetails(BuildContext context, GlowzaOrder order) {
                 label: 'Delivery',
                 value: '${order.address}, ${order.city}',
               ),
+              if (order.nearbyPlace.isNotEmpty)
+                _DetailRow(
+                  icon: Icons.place_outlined,
+                  label: 'Nearby place',
+                  value: order.nearbyPlace,
+                ),
               _DetailRow(
                 icon: Icons.phone_android,
                 label: 'Customer',

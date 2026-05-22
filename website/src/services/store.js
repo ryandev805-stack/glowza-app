@@ -145,6 +145,7 @@ export async function createOrder({ user, checkout, items, subtotal, shippingFee
     city: checkout.city,
     address: checkout.address,
     notes: checkout.area,
+    nearbyPlace: checkout.nearbyPlace || '',
     products,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

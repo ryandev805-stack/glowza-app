@@ -22,7 +22,7 @@ export function useGlowzaStore() {
   });
   const [checkoutInfo, setCheckoutInfo] = useState(() => {
     const saved = localStorage.getItem(checkoutKey);
-    return saved ? JSON.parse(saved) : { fullName: '', phone: '', city: '', area: '', address: '' };
+    return saved ? JSON.parse(saved) : { fullName: '', phone: '', city: '', area: '', address: '', nearbyPlace: '' };
   });
   const [categories, setCategories] = useState([]);
   const [banners, setBanners] = useState([]);

@@ -22,6 +22,7 @@ class GlowzaOrder {
     required this.city,
     required this.address,
     required this.notes,
+    required this.nearbyPlace,
     required this.products,
     this.createdAt,
     this.updatedAt,
@@ -43,6 +44,7 @@ class GlowzaOrder {
   final String city;
   final String address;
   final String notes;
+  final String nearbyPlace;
   final List<OrderProduct> products;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -69,6 +71,7 @@ class GlowzaOrder {
       city: data['city'] as String? ?? '',
       address: data['address'] as String? ?? '',
       notes: data['notes'] as String? ?? '',
+      nearbyPlace: data['nearbyPlace'] as String? ?? '',
       products: rawProducts
           .whereType<Map>()
           .map(
@@ -98,6 +101,7 @@ class GlowzaOrder {
       'city': city,
       'address': address,
       'notes': notes,
+      'nearbyPlace': nearbyPlace,
       'products': products.map((product) => product.toMap()).toList(),
       if (includeCreatedAt) 'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),

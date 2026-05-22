@@ -429,6 +429,7 @@ class AppState extends ChangeNotifier {
         city: checkoutInfo.city,
         address: checkoutInfo.fullAddress,
         notes: checkoutInfo.area,
+        nearbyPlace: checkoutInfo.nearbyPlace,
         products: _cart
             .map(
               (item) => OrderProduct(

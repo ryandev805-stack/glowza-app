@@ -1128,6 +1128,7 @@ function CheckoutModal({ store, onClose, onComplete }) {
     city: store.checkoutInfo.city || '',
     area: store.checkoutInfo.area || '',
     address: store.checkoutInfo.address || '',
+    nearbyPlace: store.checkoutInfo.nearbyPlace || '',
   });
   const [busy, setBusy] = useState(false);
   async function submit(event) {
@@ -1142,8 +1143,15 @@ function CheckoutModal({ store, onClose, onComplete }) {
   return (
     <Modal title="Checkout" onClose={onClose}>
       <form className="space-y-3" onSubmit={submit}>
-        {['fullName', 'phone', 'city', 'area', 'address'].map((field) => (
-          <input key={field} className="focus-ring w-full rounded-2xl border border-pink-100 px-4 py-4" required placeholder={field === 'fullName' ? 'Full name' : field[0].toUpperCase() + field.slice(1)} value={form[field]} onChange={(event) => setForm({ ...form, [field]: event.target.value })} />
+        {[
+          ['fullName', 'Full name'],
+          ['phone', '+92 phone number'],
+          ['city', 'City'],
+          ['area', 'Area / locality'],
+          ['nearbyPlace', 'Famous place near your location'],
+          ['address', 'Complete delivery address'],
+        ].map(([field, label]) => (
+          <input key={field} className="focus-ring w-full rounded-2xl border border-pink-100 px-4 py-4" required placeholder={label} value={form[field]} onChange={(event) => setForm({ ...form, [field]: event.target.value })} />
         ))}
         <div className="rounded-3xl bg-pink-50 p-4">
           <Line label="Subtotal" value={store.subtotal} />

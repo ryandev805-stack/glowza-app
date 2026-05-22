@@ -56,7 +56,7 @@ export function OrdersPage({
       .map((product) => `- ${product.name} x ${product.quantity} = ${money(product.price * product.quantity)}`)
       .join('\n');
     await navigator.clipboard?.writeText(
-      `${order.orderNumber}\n${order.customerName}\n${order.customerPhone}\n${order.address}, ${order.city}\n\n${products}\n\nTotal: ${money(order.total)}`,
+      `${order.orderNumber}\n${order.customerName}\n${order.customerPhone}\n${order.address}, ${order.city}\nArea: ${order.notes || 'None'}\nNearby: ${order.nearbyPlace || 'None'}\n\n${products}\n\nTotal: ${money(order.total)}`,
     );
   }
 
@@ -116,6 +116,7 @@ export function OrdersPage({
                     <span>{money(order.total)}</span>
                     <span>{order.totalItems} items</span>
                     <span>{order.city}</span>
+                    {order.nearbyPlace ? <span>{order.nearbyPlace}</span> : null}
                     <span>{order.paymentStatus}</span>
                   </div>
                 </div>
@@ -155,7 +156,8 @@ export function OrdersPage({
               <div><span>Customer</span><strong>{selected.customerName}</strong></div>
               <div><span>Phone</span><strong>{selected.customerPhone}</strong></div>
               <div><span>City</span><strong>{selected.city}</strong></div>
-              <div><span>Area/Notes</span><strong>{selected.notes || 'None'}</strong></div>
+              <div><span>Area</span><strong>{selected.notes || 'None'}</strong></div>
+              <div><span>Nearby Famous Place</span><strong>{selected.nearbyPlace || 'None'}</strong></div>
               <div><span>Payment</span><strong>{selected.paymentMethod}</strong></div>
               <div><span>Payment Status</span><strong>{selected.paymentStatus}</strong></div>
             </div>

@@ -166,6 +166,7 @@ export type Order = {
   city: string;
   address: string;
   notes: string;
+  nearbyPlace?: string;
   products: OrderProduct[];
   createdAt?: FirestoreDate;
   updatedAt?: FirestoreDate;
