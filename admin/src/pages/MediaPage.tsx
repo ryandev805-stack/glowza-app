@@ -66,6 +66,9 @@ export function MediaPage() {
   const categories = useCollection<Category>(useCallback(() => listCategories(), []));
   const banners = useCollection<Banner>(useCallback(() => listBanners(), []));
   const [assets, setAssets] = useState<CloudinaryAsset[]>([]);
+  const [resourceType, setResourceType] = useState<'image' | 'video'>('image');
+  const [nextCursor, setNextCursor] = useState('');
+  const [hasMore, setHasMore] = useState(false);
   const [loadingAssets, setLoadingAssets] = useState(false);
   const [busy, setBusy] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -79,22 +82,52 @@ export function MediaPage() {
   const usedPublicIds = useMemo(() => new Set(refs.map((ref) => ref.publicId)), [refs]);
   const assetPublicIds = useMemo(() => new Set(assets.map((asset) => asset.publicId)), [assets]);
   const unusedAssets = assets.filter((asset) => !usedPublicIds.has(asset.publicId));
-  const missingRefs = refs.filter((ref) => !assetPublicIds.has(ref.publicId));
+  const missingRefs: MediaRef[] = [];
   const selectedAssets = assets.filter((asset) => selectedIds.has(asset.publicId));
   const totalBytes = assets.reduce((total, asset) => total + Number(asset.bytes || 0), 0);
   const unusedBytes = unusedAssets.reduce((total, asset) => total + Number(asset.bytes || 0), 0);
 
-  async function refreshAssets() {
+  async function refreshAssets(type = resourceType) {
     setLoadingAssets(true);
     setError('');
     try {
-      setAssets(await listCloudinaryAssets());
-      setMessage('Cloudinary assets refreshed.');
+      const page = await listCloudinaryAssets(type);
+      setAssets(page.assets);
+      setNextCursor(page.nextCursor);
+      setHasMore(page.hasMore);
+      setSelectedIds(new Set());
+      setMessage(`Loaded ${page.assets.length} ${type} asset${page.assets.length === 1 ? '' : 's'}.`);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Could not load Cloudinary assets.');
     } finally {
       setLoadingAssets(false);
     }
+  }
+
+  async function loadMoreAssets() {
+    if (!hasMore || !nextCursor) return;
+    setLoadingAssets(true);
+    setError('');
+    try {
+      const page = await listCloudinaryAssets(resourceType, nextCursor);
+      setAssets((current) => {
+        const byId = new Map(current.map((asset) => [asset.publicId, asset]));
+        page.assets.forEach((asset) => byId.set(asset.publicId, asset));
+        return [...byId.values()].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      });
+      setNextCursor(page.nextCursor);
+      setHasMore(page.hasMore);
+      setMessage(`Loaded ${page.assets.length} more ${resourceType} asset${page.assets.length === 1 ? '' : 's'}.`);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Could not load more Cloudinary assets.');
+    } finally {
+      setLoadingAssets(false);
+    }
+  }
+
+  async function switchResourceType(type: 'image' | 'video') {
+    setResourceType(type);
+    await refreshAssets(type);
   }
 
   async function deleteAssets(targets: CloudinaryAsset[]) {
@@ -107,7 +140,7 @@ export function MediaPage() {
     try {
       await deleteCloudinaryAssets(targets.map((asset) => ({ publicId: asset.publicId, resourceType: asset.resourceType })));
       setSelectedIds(new Set());
-      setMessage(`Deleted ${targets.length} Cloudinary asset${targets.length === 1 ? '' : 's'}.`);
+      setMessage(`Deleted ${targets.length} Cloudinary asset${targets.length === 1 ? '' : 's'} in batches of 100 or fewer.`);
       await refreshAssets();
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Could not delete Cloudinary assets.');
@@ -152,7 +185,7 @@ export function MediaPage() {
           <p>Compare Cloudinary assets with Firestore product, category, and banner media references.</p>
         </div>
         <button disabled={loadingAssets} onClick={() => void refreshAssets()}>
-          <RefreshCcw size={17} /> {loadingAssets ? 'Loading...' : 'Scan Cloudinary'}
+          <RefreshCcw size={17} /> {loadingAssets ? 'Loading...' : 'Load Cloudinary'}
         </button>
       </div>
 
@@ -160,7 +193,7 @@ export function MediaPage() {
         <Metric title="Cloudinary Assets" value={assets.length} detail={`${bytes(totalBytes)} stored`} />
         <Metric title="Used References" value={usedPublicIds.size} detail={`${refs.length} database references`} />
         <Metric title="Unused Assets" value={unusedAssets.length} detail={`${bytes(unusedBytes)} can be removed`} />
-        <Metric title="Missing DB Refs" value={missingRefs.length} detail="clean from Firestore" />
+        <Metric title="Missing DB Refs" value="Paused" detail="disabled with paged scans" />
       </div>
 
       {message && <p className="success">{message}</p>}
@@ -170,7 +203,7 @@ export function MediaPage() {
         <div className="panel-head">
           <div>
             <h2>Cleanup Actions</h2>
-            <p>Delete only assets that are not referenced by active Firestore documents. Clean DB removes links to files no longer found in Cloudinary.</p>
+            <p>Cloudinary is loaded with cursor pagination. Delete requests are automatically split into batches of 100 assets or fewer. Database reference cleanup is paused for paged scans.</p>
           </div>
           <div className="actions">
             <button className="ghost" disabled={busy || selectedAssets.length === 0} onClick={() => void deleteAssets(selectedAssets)}>
@@ -179,7 +212,7 @@ export function MediaPage() {
             <button className="danger" disabled={busy || unusedAssets.length === 0} onClick={() => void deleteAssets(unusedAssets)}>
               <Trash2 size={17} /> Delete All Unused
             </button>
-            <button className="ghost" disabled={busy || missingRefs.length === 0} onClick={() => void cleanDatabase()}>
+            <button className="ghost" disabled>
               <DatabaseZap size={17} /> Clean Database
             </button>
           </div>
@@ -189,16 +222,22 @@ export function MediaPage() {
       <section className="panel">
         <div className="panel-head">
           <div>
-            <h2>Unused Cloudinary Assets</h2>
-            <p>{unusedAssets.length} files in Cloudinary are not used by products, categories, or banners.</p>
+            <h2>Cloudinary Assets</h2>
+            <p>{unusedAssets.length} loaded {resourceType} file{unusedAssets.length === 1 ? '' : 's'} are not used by products, categories, or banners.</p>
           </div>
-          <button
-            className="ghost"
-            disabled={unusedAssets.length === 0}
-            onClick={() => setSelectedIds(new Set(unusedAssets.map((asset) => asset.publicId)))}
-          >
-            Select All Unused
-          </button>
+          <div className="actions">
+            <div className="segmented-tabs">
+              <button className={resourceType === 'image' ? 'active' : ''} disabled={loadingAssets} onClick={() => void switchResourceType('image')}>Images</button>
+              <button className={resourceType === 'video' ? 'active' : ''} disabled={loadingAssets} onClick={() => void switchResourceType('video')}>Videos</button>
+            </div>
+            <button
+              className="ghost"
+              disabled={unusedAssets.length === 0}
+              onClick={() => setSelectedIds(new Set(unusedAssets.map((asset) => asset.publicId)))}
+            >
+              Select Loaded Unused
+            </button>
+          </div>
         </div>
         <div className="media-grid">
           {unusedAssets.map((asset) => (
@@ -218,15 +257,22 @@ export function MediaPage() {
               <p>{asset.format || asset.resourceType} · {bytes(asset.bytes)}</p>
             </article>
           ))}
-          {!loadingAssets && unusedAssets.length === 0 && <p className="empty-state">No unused Cloudinary assets found after scan.</p>}
+          {!loadingAssets && unusedAssets.length === 0 && <p className="empty-state">No unused loaded {resourceType} assets found.</p>}
         </div>
+        {hasMore && (
+          <div className="load-more-row">
+            <button className="ghost" disabled={loadingAssets} onClick={() => void loadMoreAssets()}>
+              <RefreshCcw size={17} /> {loadingAssets ? 'Loading...' : `Load More ${resourceType === 'image' ? 'Images' : 'Videos'}`}
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="panel">
         <div className="panel-head">
           <div>
             <h2>Missing Database References</h2>
-            <p>These Firestore media links point to Cloudinary files that are not currently found.</p>
+            <p>Paused while Cloudinary uses cursor pagination, because only part of the asset library is loaded at one time.</p>
           </div>
         </div>
         <div className="data-list compact-list">

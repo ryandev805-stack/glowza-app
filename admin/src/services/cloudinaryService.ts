@@ -64,13 +64,30 @@ export type CloudinaryAsset = {
   createdAt: string;
 };
 
-export async function listCloudinaryAssets(): Promise<CloudinaryAsset[]> {
-  const response = await fetch('/api/cloudinary-assets');
+export type CloudinaryAssetPage = {
+  assets: CloudinaryAsset[];
+  nextCursor: string;
+  hasMore: boolean;
+  resourceType: 'image' | 'video';
+};
+
+export async function listCloudinaryAssets(
+  resourceType: 'image' | 'video' = 'image',
+  nextCursor = '',
+): Promise<CloudinaryAssetPage> {
+  const params = new URLSearchParams({ resourceType });
+  if (nextCursor) params.set('nextCursor', nextCursor);
+  const response = await fetch(`/api/cloudinary-assets?${params.toString()}`);
   const body = await response.json();
   if (!response.ok) {
     throw new Error(body.error || 'Could not load Cloudinary assets');
   }
-  return body.assets || [];
+  return {
+    assets: body.assets || [],
+    nextCursor: body.nextCursor || '',
+    hasMore: Boolean(body.hasMore),
+    resourceType: body.resourceType === 'video' ? 'video' : 'image',
+  };
 }
 
 export async function deleteCloudinaryAssets(assets: Array<Pick<CloudinaryAsset, 'publicId' | 'resourceType'>>) {
@@ -83,5 +100,5 @@ export async function deleteCloudinaryAssets(assets: Array<Pick<CloudinaryAsset,
   if (!response.ok) {
     throw new Error(body.error || 'Could not delete Cloudinary assets');
   }
-  return body as { requested: number; deleted: Record<string, string> };
+  return body as { requested: number; deleted: Record<string, string>; batches: number };
 }

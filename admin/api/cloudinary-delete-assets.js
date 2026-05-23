@@ -34,6 +34,15 @@ async function deleteBatch(resourceType, publicIds, cloudName, authHeader) {
   return body.deleted || {};
 }
 
+async function deleteInChunks(resourceType, publicIds, cloudName, authHeader) {
+  const deleted = {};
+  for (let index = 0; index < publicIds.length; index += 100) {
+    const chunk = publicIds.slice(index, index + 100);
+    Object.assign(deleted, await deleteBatch(resourceType, chunk, cloudName, authHeader));
+  }
+  return deleted;
+}
+
 export default async function handler(request, response) {
   if (request.method !== 'POST') {
     response.setHeader('Allow', 'POST');
@@ -65,13 +74,14 @@ export default async function handler(request, response) {
     const imageIds = safeAssets.filter((asset) => asset.resourceType === 'image').map((asset) => asset.publicId);
     const videoIds = safeAssets.filter((asset) => asset.resourceType === 'video').map((asset) => asset.publicId);
     const [deletedImages, deletedVideos] = await Promise.all([
-      deleteBatch('image', imageIds, cloudName, authHeader),
-      deleteBatch('video', videoIds, cloudName, authHeader),
+      deleteInChunks('image', imageIds, cloudName, authHeader),
+      deleteInChunks('video', videoIds, cloudName, authHeader),
     ]);
 
     return response.status(200).json({
       deleted: { ...deletedImages, ...deletedVideos },
       requested: safeAssets.length,
+      batches: Math.ceil(imageIds.length / 100) + Math.ceil(videoIds.length / 100),
     });
   } catch (error) {
     return response.status(500).json({

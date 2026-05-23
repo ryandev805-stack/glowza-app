@@ -17,38 +17,31 @@ function readEnv(name) {
   return line ? line.slice(line.indexOf('=') + 1).trim().replace(/^["']|["']$/g, '') : undefined;
 }
 
-async function listByType(resourceType, cloudName, authHeader) {
-  const resources = [];
-  let nextCursor = '';
+async function listByType(resourceType, cloudName, authHeader, nextCursor = '') {
+  const url = new URL(`https://api.cloudinary.com/v1_1/${cloudName}/resources/${resourceType}/upload`);
+  url.searchParams.set('prefix', `${folder}/`);
+  url.searchParams.set('max_results', '100');
+  if (nextCursor) url.searchParams.set('next_cursor', nextCursor);
 
-  do {
-    const url = new URL(`https://api.cloudinary.com/v1_1/${cloudName}/resources/${resourceType}/upload`);
-    url.searchParams.set('prefix', `${folder}/`);
-    url.searchParams.set('max_results', '500');
-    if (nextCursor) url.searchParams.set('next_cursor', nextCursor);
+  const cloudinaryResponse = await fetch(url, { headers: { authorization: authHeader } });
+  const body = await cloudinaryResponse.json();
+  if (!cloudinaryResponse.ok) {
+    throw new Error(body.error?.message || `Could not list ${resourceType} assets`);
+  }
 
-    const response = await fetch(url, { headers: { authorization: authHeader } });
-    const body = await response.json();
-    if (!response.ok) {
-      throw new Error(body.error?.message || `Could not list ${resourceType} assets`);
-    }
-
-    resources.push(
-      ...(body.resources || []).map((asset) => ({
-        publicId: asset.public_id,
-        resourceType,
-        format: asset.format || '',
-        bytes: Number(asset.bytes || 0),
-        width: asset.width || 0,
-        height: asset.height || 0,
-        secureUrl: asset.secure_url,
-        createdAt: asset.created_at,
-      })),
-    );
-    nextCursor = body.next_cursor || '';
-  } while (nextCursor);
-
-  return resources;
+  return {
+    assets: (body.resources || []).map((asset) => ({
+      publicId: asset.public_id,
+      resourceType,
+      format: asset.format || '',
+      bytes: Number(asset.bytes || 0),
+      width: asset.width || 0,
+      height: asset.height || 0,
+      secureUrl: asset.secure_url,
+      createdAt: asset.created_at,
+    })),
+    nextCursor: body.next_cursor || '',
+  };
 }
 
 export default async function handler(request, response) {
@@ -67,14 +60,16 @@ export default async function handler(request, response) {
 
   try {
     const authHeader = `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')}`;
-    const [images, videos] = await Promise.all([
-      listByType('image', cloudName, authHeader),
-      listByType('video', cloudName, authHeader),
-    ]);
+    const resourceType = request.query?.resourceType === 'video' ? 'video' : 'image';
+    const nextCursor = typeof request.query?.nextCursor === 'string' ? request.query.nextCursor : '';
+    const result = await listByType(resourceType, cloudName, authHeader, nextCursor);
 
     return response.status(200).json({
       folder,
-      assets: [...images, ...videos].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))),
+      resourceType,
+      assets: result.assets,
+      nextCursor: result.nextCursor,
+      hasMore: Boolean(result.nextCursor),
     });
   } catch (error) {
     return response.status(500).json({

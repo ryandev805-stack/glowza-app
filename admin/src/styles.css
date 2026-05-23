@@ -1337,6 +1337,30 @@ button.review-summary {
   margin-top: 14px;
 }
 
+.segmented-tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.segmented-tabs button {
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.segmented-tabs button.active {
+  background: white;
+  color: var(--primary);
+  box-shadow: 0 10px 22px rgba(61, 10, 42, 0.08);
+}
+
 .error {
   color: var(--danger);
   font-weight: 800;
@@ -1419,6 +1443,12 @@ button.review-summary {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
+}
+
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  padding-top: 16px;
 }
 
 .login {
