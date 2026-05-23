@@ -29,6 +29,7 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
   const [minPrice, setMinPrice] = useState(200);
   const [maxPrice, setMaxPrice] = useState(5000);
   const [bulkUrlsText, setBulkUrlsText] = useState('');
+  const [activeSource, setActiveSource] = useState<'listing' | 'single' | 'urls'>('listing');
   const [candidates, setCandidates] = useState<WinningProductCandidate[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -249,7 +250,19 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
           <label>Max Markaz Price<input type="number" min="0" value={maxPrice} onChange={(event) => setMaxPrice(Number(event.target.value))} /></label>
         </div>
         <div className="automation-source-grid">
-          <article className="automation-source-card">
+          <div className="automation-tabs" role="tablist" aria-label="Markaz import source">
+            <button className={activeSource === 'listing' ? 'active' : ''} onClick={() => setActiveSource('listing')}>
+              <Search size={16} /> Listing
+            </button>
+            <button className={activeSource === 'single' ? 'active' : ''} onClick={() => setActiveSource('single')}>
+              <Link2 size={16} /> Single
+            </button>
+            <button className={activeSource === 'urls' ? 'active' : ''} onClick={() => setActiveSource('urls')}>
+              <FileText size={16} /> URL List
+            </button>
+          </div>
+
+          {activeSource === 'listing' && <article className="automation-source-card">
             <div className="source-icon"><Search size={19} /></div>
             <div>
               <h3>Scan Listing or Search URL</h3>
@@ -257,9 +270,9 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
             </div>
             <label>Markaz URL<input value={categoryUrl} onChange={(event) => setCategoryUrl(event.target.value)} /></label>
             <button disabled={loading} onClick={() => void scan()}><Search size={17} /> {loading ? 'Scanning...' : 'Scan URL'}</button>
-          </article>
+          </article>}
 
-          <article className="automation-source-card">
+          {activeSource === 'single' && <article className="automation-source-card">
             <div className="source-icon"><Link2 size={19} /></div>
             <div>
               <h3>Fetch Single Product</h3>
@@ -269,9 +282,9 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
             <button className="ghost" disabled={loading || !productUrl.trim()} onClick={() => void fetchSingleProduct()}>
               <Search size={17} /> {loading ? 'Fetching...' : 'Fetch Product'}
             </button>
-          </article>
+          </article>}
 
-          <article className="automation-source-card bulk-url-card">
+          {activeSource === 'urls' && <article className="automation-source-card bulk-url-card">
             <div className="source-icon"><FileText size={19} /></div>
             <div>
               <h3>Import product_urls.txt</h3>
@@ -297,7 +310,7 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
                 <UploadCloud size={17} /> {loading ? 'Fetching...' : 'Fetch URL List'}
               </button>
             </div>
-          </article>
+          </article>}
         </div>
         {message && <p className="success">{message}</p>}
         {error && <p className="error">{error}</p>}

@@ -15,6 +15,7 @@ import {
   RefreshCcw,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
   ShoppingBag,
   Sparkles,
   Star,
@@ -513,6 +514,7 @@ function ProductSection({ title, products, fallback, onOpenProduct, onCart, onWi
 
 function ShopPage({ store, products, query, setQuery, category, setCategory, sort, setSort, onOpenProduct, onCart, onWish }) {
   const loadMoreRef = useRef(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -531,33 +533,51 @@ function ShopPage({ store, products, query, setQuery, category, setCategory, sor
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-5 sm:py-8 lg:px-8">
-      <div className="mb-5 rounded-[1.6rem] bg-white p-3 shadow-glow sm:mb-6 sm:rounded-[2rem] sm:p-5">
-        <div className="grid gap-3 lg:grid-cols-[1fr_220px_180px]">
+      <div className="mb-5 rounded-[1.25rem] bg-white p-2.5 shadow-glow sm:mb-6 sm:rounded-[1.5rem] sm:p-3">
+        <div className="grid grid-cols-[1fr_auto] gap-2 sm:gap-3">
           <label className="relative block">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-glowza-pink" size={18} />
-            <input className="focus-ring w-full rounded-2xl border border-pink-100 py-3.5 pl-11 pr-4 text-sm sm:py-4 sm:text-base" placeholder="Search fashion, gadgets, home..." value={query} onChange={(event) => setQuery(event.target.value)} />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-glowza-pink" size={17} />
+            <input className="focus-ring w-full rounded-2xl border border-pink-100 py-3 pl-10 pr-3 text-sm sm:py-3.5 sm:text-base" placeholder="Search products" value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
-          <select className="focus-ring rounded-2xl border border-pink-100 px-4 py-3.5 text-sm sm:py-4 sm:text-base" value={category} onChange={(event) => setCategory(event.target.value)}>
-            <option value="all">All categories</option>
-            {store.categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
-          <select className="focus-ring rounded-2xl border border-pink-100 px-4 py-3.5 text-sm sm:py-4 sm:text-base" value={sort} onChange={(event) => setSort(event.target.value)}>
-            <option value="popular">Popular</option>
-            <option value="new">Newest</option>
-            <option value="price-low">Price low to high</option>
-            <option value="price-high">Price high to low</option>
-            <option value="rated">Highest rated</option>
-          </select>
+          <button className="inline-flex items-center justify-center gap-2 rounded-2xl bg-glowza-plum px-3 py-2.5 text-sm font-bold text-white sm:px-4" onClick={() => setFiltersOpen(true)}>
+            <SlidersHorizontal size={17} />
+            <span className="hidden sm:inline">Filters</span>
+          </button>
         </div>
       </div>
+      {filtersOpen && (
+        <Modal title="Filters" onClose={() => setFiltersOpen(false)}>
+          <div className="grid gap-3">
+            <label className="grid gap-2 text-sm font-bold text-glowza-plum">
+              Category
+              <select className="focus-ring rounded-2xl border border-pink-100 px-4 py-3 text-sm" value={category} onChange={(event) => setCategory(event.target.value)}>
+                <option value="all">All categories</option>
+                {store.categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-glowza-plum">
+              Sort
+              <select className="focus-ring rounded-2xl border border-pink-100 px-4 py-3 text-sm" value={sort} onChange={(event) => setSort(event.target.value)}>
+                <option value="popular">Popular</option>
+                <option value="new">Newest</option>
+                <option value="price-low">Price low to high</option>
+                <option value="price-high">Price high to low</option>
+                <option value="rated">Highest rated</option>
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button className="rounded-2xl bg-pink-50 px-4 py-3 text-sm font-bold text-glowza-pink" onClick={() => { setCategory('all'); setSort('popular'); }}>
+                Reset
+              </button>
+              <button className="rounded-2xl bg-glowza-pink px-4 py-3 text-sm font-bold text-white" onClick={() => setFiltersOpen(false)}>
+                Apply
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
       {store.loading && <p className="rounded-2xl bg-white p-6 font-bold text-glowza-pink">Loading products...</p>}
       {store.error && <p className="rounded-2xl bg-red-50 p-6 font-bold text-red-600">{store.error}</p>}
-      <div className="mb-5 flex items-end justify-between">
-        <div>
-          <p className="text-xs font-black uppercase text-glowza-pink sm:text-sm">Shop</p>
-          <h1 className="text-3xl font-black text-glowza-plum sm:text-4xl">{products.length} products</h1>
-        </div>
-      </div>
       <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
         {products.map((product) => (
           <ProductCard key={product.id} product={product} wished={store.wishlist.has(product.id)} onOpen={() => onOpenProduct(product)} onCart={() => onCart(product)} onWish={() => onWish(product)} />

@@ -58,3 +58,6 @@ app.*.map.json
 /games/*/dist/
 /games/*/.env
 /games/*/.vercel/
+/markaz-playwright-scraper/node_modules/
+/markaz-playwright-scraper/products.json
+/markaz-playwright-scraper/product_urls.txt
