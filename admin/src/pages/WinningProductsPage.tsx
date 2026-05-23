@@ -48,6 +48,20 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
   );
   const selected = candidates.filter((candidate) => selectedIds.has(candidate.id));
   const parsedBulkUrls = useMemo(() => parseProductUrls(bulkUrlsText), [bulkUrlsText]);
+  const settingsCopy = {
+    listing: {
+      title: 'Listing Scan Settings',
+      description: 'Set the import category, listing fetch limit, and Markaz price range for category, shop, or search scans.',
+    },
+    single: {
+      title: 'Single Product Settings',
+      description: 'Choose the import category and price range for one Markaz product detail URL.',
+    },
+    urls: {
+      title: 'URL List Settings',
+      description: 'Choose the import category and price range for products loaded from product_urls.txt.',
+    },
+  }[activeSource];
 
   function applyCandidates(result: WinningProductCandidate[], autoScore = true) {
     const withDuplicates = result.map((candidate) => ({
@@ -232,8 +246,8 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
       <section className="panel winning-control-panel">
         <div className="panel-head">
           <div>
-            <h2>Import Settings</h2>
-            <p>Choose the Glowza category and pricing range once, then use any product source below.</p>
+            <h2>{settingsCopy.title}</h2>
+            <p>{settingsCopy.description}</p>
           </div>
           <button className="ghost" onClick={() => void products.refresh()}><RefreshCcw size={17} /> Refresh Products</button>
         </div>
@@ -245,7 +259,15 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
               {categories.items.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </select>
           </label>
-          <label>Max Products<input type="number" min="1" max="30" value={maxProducts} onChange={(event) => setMaxProducts(Number(event.target.value))} /></label>
+          {activeSource === 'listing' && (
+            <label>Max Products<input type="number" min="1" max="30" value={maxProducts} onChange={(event) => setMaxProducts(Number(event.target.value))} /></label>
+          )}
+          {activeSource === 'urls' && (
+            <label>URL Count<input readOnly value={`${parsedBulkUrls.length} valid URLs`} /></label>
+          )}
+          {activeSource === 'single' && (
+            <label>Mode<input readOnly value="Single product fetch" /></label>
+          )}
           <label>Min Markaz Price<input type="number" min="0" value={minPrice} onChange={(event) => setMinPrice(Number(event.target.value))} /></label>
           <label>Max Markaz Price<input type="number" min="0" value={maxPrice} onChange={(event) => setMaxPrice(Number(event.target.value))} /></label>
         </div>
