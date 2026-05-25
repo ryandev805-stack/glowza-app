@@ -3,7 +3,8 @@ import {
   createOrder,
   fetchActiveBanners,
   fetchActiveCategories,
-  fetchActiveProductPage,
+  fetchDirectListingByCategories,
+  fetchDirectListingMore,
   fetchActiveProductsByCategory,
   shuffleDirectListing,
   rankProducts,
@@ -30,7 +31,7 @@ function mergeCatalogProducts(current, incoming) {
 
 const userKey = 'glowza_web_user';
 const checkoutKey = 'glowza_web_checkout';
-const productPageSize = 80;
+const productsPerCategory = 16;
 
 export function useGlowzaStore() {
   const [user, setUser] = useState(() => {
@@ -49,7 +50,7 @@ export function useGlowzaStore() {
   const [searching, setSearching] = useState(false);
   const [categoryResults, setCategoryResults] = useState([]);
   const [categoryLoading, setCategoryLoading] = useState(false);
-  const [productCursor, setProductCursor] = useState(null);
+  const [categoryListingStates, setCategoryListingStates] = useState({});
   const [hasMoreProducts, setHasMoreProducts] = useState(false);
   const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
   const [orders, setOrders] = useState([]);
@@ -90,15 +91,14 @@ export function useGlowzaStore() {
         fetchActiveCategories(),
         fetchActiveBanners(),
       ]);
-      const productPage = await fetchActiveProductPage({
-        categoryList: categoryData,
-        pageSize: productPageSize,
+      const listing = await fetchDirectListingByCategories(categoryData, {
+        perCategory: productsPerCategory,
       });
       setCategories(categoryData);
       setBanners(bannerData);
-      setCatalogProducts(productPage.products);
-      setProductCursor(productPage.cursor);
-      setHasMoreProducts(productPage.hasMore);
+      setCatalogProducts(listing.products);
+      setCategoryListingStates(listing.categoryStates);
+      setHasMoreProducts(listing.hasMore);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load store');
     } finally {
@@ -111,14 +111,12 @@ export function useGlowzaStore() {
     setLoadingMoreProducts(true);
     setError('');
     try {
-      const productPage = await fetchActiveProductPage({
-        categoryList: categories,
-        pageSize: productPageSize,
-        cursor: productCursor,
+      const listing = await fetchDirectListingMore(categories, categoryListingStates, {
+        perCategory: productsPerCategory,
       });
-      setCatalogProducts((current) => mergeCatalogProducts(current, productPage.products));
-      setProductCursor(productPage.cursor);
-      setHasMoreProducts(productPage.hasMore);
+      setCatalogProducts((current) => mergeCatalogProducts(current, listing.products));
+      setCategoryListingStates(listing.categoryStates);
+      setHasMoreProducts(listing.hasMore);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load more products');
     } finally {

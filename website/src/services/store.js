@@ -174,6 +174,107 @@ export async function fetchActiveProductPage({ categoryList, pageSize = 20, curs
   };
 }
 
+async function fetchCategoryProductChunk(categoryId, categoryList, { pageSize = 16, cursor = null }) {
+  if (!categoryId) {
+    return { products: [], cursor: null, hasMore: false };
+  }
+
+  try {
+    const constraints = [
+      where('isActive', '==', true),
+      where('categoryId', '==', categoryId),
+      orderBy('createdAt', 'desc'),
+      limit(pageSize),
+    ];
+    if (cursor) {
+      constraints.splice(3, 0, startAfter(cursor));
+    }
+    const snapshot = await getDocs(query(collection(db, paths.products), ...constraints));
+    return {
+      products: mapProducts(snapshot, categoryList),
+      cursor: snapshot.docs[snapshot.docs.length - 1] || null,
+      hasMore: snapshot.docs.length === pageSize,
+    };
+  } catch {
+    if (cursor) {
+      return { products: [], cursor: null, hasMore: false };
+    }
+    const snapshot = await getDocs(
+      query(
+        collection(db, paths.products),
+        where('isActive', '==', true),
+        where('categoryId', '==', categoryId),
+        limit(pageSize),
+      ),
+    );
+    return {
+      products: mapProducts(snapshot, categoryList),
+      cursor: null,
+      hasMore: false,
+    };
+  }
+}
+
+/** Load products from every active category so direct listing can mix one per category. */
+export async function fetchDirectListingByCategories(categoryList, { perCategory = 16 } = {}) {
+  if (!categoryList.length) {
+    return { products: [], categoryStates: {}, hasMore: false };
+  }
+
+  const chunks = await Promise.all(
+    categoryList.map(async (category) => {
+      const chunk = await fetchCategoryProductChunk(category.id, categoryList, { pageSize: perCategory });
+      return { categoryId: category.id, ...chunk };
+    }),
+  );
+
+  const categoryStates = {};
+  chunks.forEach((chunk) => {
+    categoryStates[chunk.categoryId] = {
+      cursor: chunk.cursor,
+      hasMore: chunk.hasMore,
+    };
+  });
+
+  return {
+    products: chunks.flatMap((chunk) => chunk.products),
+    categoryStates,
+    hasMore: Object.values(categoryStates).some((state) => state.hasMore),
+  };
+}
+
+export async function fetchDirectListingMore(categoryList, categoryStates, { perCategory = 16 } = {}) {
+  const categoriesWithMore = categoryList.filter((category) => categoryStates[category.id]?.hasMore);
+  if (!categoriesWithMore.length) {
+    return { products: [], categoryStates: { ...categoryStates }, hasMore: false };
+  }
+
+  const chunks = await Promise.all(
+    categoriesWithMore.map(async (category) => {
+      const previous = categoryStates[category.id];
+      const chunk = await fetchCategoryProductChunk(category.id, categoryList, {
+        pageSize: perCategory,
+        cursor: previous?.cursor || null,
+      });
+      return { categoryId: category.id, ...chunk };
+    }),
+  );
+
+  const nextStates = { ...categoryStates };
+  chunks.forEach((chunk) => {
+    nextStates[chunk.categoryId] = {
+      cursor: chunk.cursor,
+      hasMore: chunk.hasMore,
+    };
+  });
+
+  return {
+    products: chunks.flatMap((chunk) => chunk.products),
+    categoryStates: nextStates,
+    hasMore: Object.values(nextStates).some((state) => state.hasMore),
+  };
+}
+
 export async function fetchActiveProductsByCategory({ categoryId, categoryList, pageSize = 160 }) {
   if (!categoryId || categoryId === 'all') {
     const page = await fetchActiveProductPage({ categoryList, pageSize });
