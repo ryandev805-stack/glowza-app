@@ -8,20 +8,70 @@ const lastNames = [
   'Khan', 'Malik', 'Sheikh', 'Raza', 'Butt', 'Qureshi', 'Ahmed', 'Farooq', 'Javed', 'Mirza',
 ];
 const averageComments = [
-  'Product is okay for the price. Delivery was fine and packaging was acceptable.',
-  'Average experience overall. It works, but I expected slightly better finishing.',
-  'Decent item for daily use. Not perfect, but fair value in this price range.',
+  'theek hai price k hisab se, khas wow nhi',
+  'acha ha bs delivery 1 din late ai',
+  'normal cheez hai, kharab b nhi zyada best b nhi',
+  'ok ok use ho jati hai daily',
+  'pic sy thora diff tha color but chalta hai',
+  'mehnga feel hua thora lekin quality theek',
+  'packaging theek thi product b theek, average experience',
+  '3 star dena banta hai, koi issue nhi bas expectation zyada thi',
+  'sahi ha is range mein, dubara soch k order kru gi',
+  'theek theek, khas complaint nhi',
+  'delivery rider acha tha, product average',
+  'use kr liya, chal rha hai abhi tak',
+  'hn theek hai, recommend half half',
+  'quality ok hai finishing thori normal',
+  'price kam hota to 4 star deti, warna 3',
+  'gift dia tha cousin ko, unko theek laga',
+  'box thora kharab aya andar sab ok tha',
+  'fast delivery thi product normal hi hai',
+  'acha laga but size chart dekh k order krein',
+  'thori smell ai nayi cheez ki, 2 din baad theek',
 ];
 const goodComments = [
-  'Very good quality and exactly as shown. I am satisfied with this purchase.',
-  'Loved the product. Packaging was neat and delivery was smooth.',
-  'Great value for money. I would recommend this to other buyers.',
-  'Quality is better than expected. Will order again from Glowza.',
-  'Nice product, useful and well packed. Good shopping experience.',
+  'bht acha hai yaar, same jesa pic mein tha',
+  'mujhe bohat pasand aya ❤️ dubara order kru gi',
+  'quality zabardast hai, paisay wasool',
+  'packaging neat thi, product b original laga',
+  '5 star banta hai, recommend krta hun',
+  'glowza se pehli dfa order, experience acha rha',
+  'wife ko dia pasand a gya, shukriya',
+  'delivery jaldi ai, cheez b solid hai',
+  'bhai ye wala must buy hai is price mein',
+  'bohat pyara color aur stuff soft hai',
+  'pic match krta 100%, happy customer',
+  'acha product hai, value for money',
+  'maza aya use kr k, friends ko b bola hai',
+  'satisfied hun, next sale mein phr lunga',
+  'quality se zyada expectation thi acha surprise',
+  'fast shipping + achi cheez = 5 star',
+  'gift wrap acha tha, product b top notch',
+  'yaar kamaal hai, 3 pieces order kiye thy sab ok',
+  'recommend ✅',
+  'bnti hai bilkul, size perfect aya',
+  '10/10 is price range mein',
+  'hn bht acha',
+  'love it',
+  'sahi cheez hai glowza',
+  'delivery + product dono spot on',
+  'mama ko pasand aya, unki taraf se thanks',
+  'quality achi hai, dubara order pakka',
+  'acha laga, rider b polite tha',
+  'worth it hai, mehnga nhi laga end mein',
+  'bohat soft material hai, comfy',
+  'exact same hai jesa live mein dikha tha',
+  'star dena bhool gya warna 5 tha 😅',
+  'pkging safe thi, glass item b safe aya',
+  'ziada socha tha average hoga, par acha nikla',
 ];
 
 function pick(list, index) {
   return list[index % list.length];
+}
+
+function pickReview(list, productIndex, reviewIndex) {
+  return list[(productIndex * 5 + reviewIndex * 13) % list.length];
 }
 
 function customer(index) {
@@ -94,19 +144,19 @@ export default async function handler(request, response) {
         {
           customerName: customer(productIndex * 3),
           rating: 3,
-          comment: pick(averageComments, productIndex),
+          comment: pickReview(averageComments, productIndex, 0),
           createdAt: new Date(Date.now() - (productIndex + 3) * 86400000).toISOString(),
         },
         {
           customerName: customer(productIndex * 3 + 1),
           rating: 5,
-          comment: pick(goodComments, productIndex),
+          comment: pickReview(goodComments, productIndex, 1),
           createdAt: new Date(Date.now() - (productIndex + 2) * 86400000).toISOString(),
         },
         {
           customerName: customer(productIndex * 3 + 2),
           rating: 4,
-          comment: pick(goodComments, productIndex + 2),
+          comment: pickReview(goodComments, productIndex, 2),
           createdAt: new Date(Date.now() - (productIndex + 1) * 86400000).toISOString(),
         },
       ];
