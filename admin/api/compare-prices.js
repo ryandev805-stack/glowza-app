@@ -3,7 +3,7 @@
 // POST /api/competitor-prices  { query: string, limit?: number }
 // ─────────────────────────────────────────────────────────────────────────────
 
-const TIMEOUT_MS = 8_000;
+const TIMEOUT_MS = 15_000;
 const MIN_RELEVANCE = 0.3;
 
 const UA =
@@ -18,31 +18,49 @@ const SHOPIFY_STORES = [
 
 const SERPAPI_KEY = process.env.SERPAPI_API_KEY || process.env.SERPAPI_KEY || '';
 
-const IMAGE_SEARCH_DOMAINS = [
-  'daraz.pk',
-  'bagallery.com',
-  'elo.pk',
-  'naheed.pk',
-  'sapphireonline.pk',
-  'sanasafinaz.com',
-  'khaadi.com',
-  'alkaram.com',
-  'gul-ahmed.com',
-  'limelight.pk',
+const MARKETPLACE_SOURCES = [
+  ['daraz.pk', 'Daraz Pakistan'],
+  ['olx.com.pk', 'OLX Pakistan'],
+  ['goto.com.pk', 'Goto'],
+  ['yayvo.com', 'Yayvo'],
+  ['hummart.com', 'HumMart'],
+  ['priceoye.pk', 'PriceOye'],
+  ['telemart.pk', 'Telemart'],
+  ['shophive.com', 'Shophive'],
+  ['homeshopping.pk', 'HomeShopping'],
+  ['ishopping.pk', 'iShopping'],
+  ['symbios.pk', 'Symbios'],
+  ['khaadi.com', 'Khaadi'],
+  ['sapphireonline.pk', 'Sapphire'],
+  ['nishatlinen.com', 'Nishat Linen'],
+  ['limelight.pk', 'Limelight'],
+  ['beechtree.pk', 'Beechtree'],
+  ['outfitters.com.pk', 'Outfitters'],
+  ['zellbury.com', 'Zellbury'],
+  ['alkaramstudio.com', 'Alkaram Studio'],
+  ['alkaram.com', 'Alkaram'],
+  ['bonanzasatrangi.com', 'Bonanza Satrangi'],
+  ['gul-ahmed.com', 'Gul Ahmed'],
+  ['bagallery.com', 'Bagallery'],
+  ['vegas.pk', 'Vegas.pk'],
+  ['just4girls.pk', 'Just4Girls'],
+  ['naheed.pk', 'Naheed'],
+  ['foodpanda.pk', 'Pandamart'],
+  ['metro-online.pk', 'Metro Online'],
+  ['grocerapp.pk', 'GrocerApp'],
+  ['readings.com.pk', 'Readings'],
+  ['libertybooks.com', 'Liberty Books'],
+  ['interwood.pk', 'Interwood'],
+  ['habitt.com', 'Habitt'],
+  ['apnafurniture.pk', 'Apna Furniture'],
 ];
 
-const SOURCE_NAMES = {
-  'daraz.pk': 'Daraz',
-  'bagallery.com': 'Bagallery',
-  'elo.pk': 'Elo',
-  'naheed.pk': 'Naheed',
-  'sapphireonline.pk': 'Sapphire',
-  'sanasafinaz.com': 'Sana Safinaz',
-  'khaadi.com': 'Khaadi',
-  'alkaram.com': 'Al-Karam',
-  'gul-ahmed.com': 'Gul Ahmed',
-  'limelight.pk': 'Limelight',
-};
+const IMAGE_SEARCH_DOMAINS = MARKETPLACE_SOURCES.map(([domain]) => domain);
+const SOURCE_NAMES = Object.fromEntries(MARKETPLACE_SOURCES);
+const COMMERCE_DOMAIN_RE = new RegExp(
+  `https?:\\\\?/\\\\?/(?:www\\.)?(${IMAGE_SEARCH_DOMAINS.map(domain => domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})[^"'\\\\<>\\s]+`,
+  'gi',
+);
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
@@ -244,6 +262,36 @@ async function enrichImageResults(results, signal) {
   return results.map((result) => enrichedByUrl.get(result.url) || result);
 }
 
+async function enrichProductResults(results, signal, maxItems = 12) {
+  const candidates = results.slice(0, maxItems);
+  const settled = await Promise.allSettled(
+    candidates.map(async (result) => {
+      if (result.price > 0 && result.title && result.image) return result;
+      const res = await fetch(result.url, {
+        signal,
+        headers: {
+          'User-Agent': UA,
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      if (!res.ok) return result;
+      const html = await res.text();
+      const extracted = productFromHtml(html, result.url);
+      return {
+        ...result,
+        title: extracted.title || result.title,
+        price: extracted.price || result.price,
+        image: extracted.image || result.image,
+        url: extracted.url || result.url,
+      };
+    }),
+  );
+  return settled
+    .filter(entry => entry.status === 'fulfilled')
+    .map(entry => entry.value);
+}
+
 // ─── Shopify Adapter ──────────────────────────────────────────────────────────
 
 async function fetchOneShopifyStore({ domain, name }, query, signal) {
@@ -426,6 +474,54 @@ async function fetchNaheed(query, signal) {
   return results;
 }
 
+async function fetchGoogleMarketplaceSearch(queryText, signal) {
+  const domainChunks = [];
+  for (let index = 0; index < IMAGE_SEARCH_DOMAINS.length; index += 7) {
+    domainChunks.push(IMAGE_SEARCH_DOMAINS.slice(index, index + 7));
+  }
+
+  const settled = await Promise.allSettled(
+    domainChunks.map(async (domains) => {
+      const siteQuery = domains.map(domain => `site:${domain}`).join(' OR ');
+      const url = `https://www.google.com/search?q=${encodeURIComponent(`(${siteQuery}) ${queryText} price`)}&num=10`;
+      const res = await fetch(url, {
+        signal,
+        headers: {
+          'User-Agent': UA,
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      if (!res.ok) return [];
+      const html = await res.text();
+      const results = [];
+      const seen = new Set();
+      const linkRe = /href="\/url\?q=(https?:\/\/(?!www\.google)[^"&]+)/gi;
+      let match;
+      while ((match = linkRe.exec(html)) !== null && results.length < 8) {
+        const productUrl = cleanExternalUrl(match[1]);
+        if (!productUrl || seen.has(productUrl) || !domains.some(domain => productUrl.includes(domain))) continue;
+        seen.add(productUrl);
+        const ctx = html.substring(Math.max(0, match.index - 500), Math.min(html.length, match.index + 1200));
+        const title = stripHtml(ctx.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i)?.[1] || '').replace(/\s*-\s*Google Search.*/i, '');
+        results.push({
+          title: title || sourceFromUrl(productUrl),
+          price: priceFromContext(ctx),
+          url: productUrl,
+          image: '',
+          source: sourceFromUrl(productUrl),
+          foundBy: 'text',
+        });
+      }
+      return enrichProductResults(results, signal, 5);
+    }),
+  );
+
+  return settled
+    .filter(entry => entry.status === 'fulfilled')
+    .flatMap(entry => entry.value);
+}
+
 // ─── Google Image Search Adapter ─────────────────────────────────────────────
 
 /**
@@ -467,8 +563,8 @@ async function fetchGoogleImageSearch(imageUrl, signal) {
       });
     }
 
-    const rawKnownUrlRe = /https?:\\?\/\\?\/(?:www\.)?(daraz\.pk|bagallery\.com|elo\.pk|naheed\.pk|sapphireonline\.pk|sanasafinaz\.com|khaadi\.com|alkaram\.com|gul-ahmed\.com|limelight\.pk)[^"'\\<>\s]+/gi;
-    while ((match = rawKnownUrlRe.exec(html)) !== null && results.length < 12) {
+    COMMERCE_DOMAIN_RE.lastIndex = 0;
+    while ((match = COMMERCE_DOMAIN_RE.exec(html)) !== null && results.length < 12) {
       const url = match[0].replace(/\\\//g, '/');
       const ctx = html.substring(Math.max(0, match.index - 500), Math.min(html.length, match.index + 1200));
       addImageSearchResult(results, seen, {
@@ -500,9 +596,9 @@ async function fetchGoogleLensUploadByUrl(imageUrl, signal) {
     });
     if (!res.ok) return [];
     const html = await res.text();
-    const rawKnownUrlRe = /https?:\\?\/\\?\/(?:www\.)?(daraz\.pk|bagallery\.com|elo\.pk|naheed\.pk|sapphireonline\.pk|sanasafinaz\.com|khaadi\.com|alkaram\.com|gul-ahmed\.com|limelight\.pk)[^"'\\<>\s]+/gi;
     let match;
-    while ((match = rawKnownUrlRe.exec(html)) !== null && results.length < 12) {
+    COMMERCE_DOMAIN_RE.lastIndex = 0;
+    while ((match = COMMERCE_DOMAIN_RE.exec(html)) !== null && results.length < 12) {
       const url = match[0].replace(/\\\//g, '/');
       const ctx = html.substring(Math.max(0, match.index - 500), Math.min(html.length, match.index + 1200));
       addImageSearchResult(results, seen, {
@@ -628,6 +724,7 @@ async function fetchAllAdapters(query, imageUrl) {
       fetchShopifyStores(query, controller.signal),
       fetchDaraz(query, controller.signal),
       fetchNaheed(query, controller.signal),
+      fetchGoogleMarketplaceSearch(query, controller.signal),
     ];
 
     // Run image search in parallel when imageUrl is provided
