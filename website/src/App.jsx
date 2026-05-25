@@ -115,18 +115,15 @@ export default function App() {
     void store.loadCategoryProducts(category);
   }, [category, store.categories.length]);
 
-  const rankedCatalog = useMemo(
-    () => store.rankedProducts(store.products),
-    [store.products, store.rotationSeed],
-  );
+  const rankedCatalog = store.products;
   const isSearchMode = query.trim().length > 0;
 
   const filteredProducts = useMemo(() => {
     const sourceProducts = isSearchMode
-      ? store.rankedProducts(store.searchResults)
+      ? store.searchResults
       : category === 'all'
         ? rankedCatalog
-        : store.rankedProducts(store.categoryResults);
+        : store.categoryResults;
     const products = sourceProducts.filter((product) => {
       const matchesCategory = category === 'all' || product.categoryId === category || product.categoryName === category;
       return matchesCategory;
@@ -138,7 +135,7 @@ export default function App() {
       if (sort === 'new') return Number(b.createdAt?.seconds || 0) - Number(a.createdAt?.seconds || 0);
       return 0;
     });
-  }, [rankedCatalog, store.searchResults, store.categoryResults, store.rotationSeed, isSearchMode, category, sort]);
+  }, [rankedCatalog, store.searchResults, store.categoryResults, isSearchMode, category, sort]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -425,9 +422,9 @@ function NavIcon({ item, size = 18 }) {
 function HomePage({ store, setActive, setCategory, onOpenProduct, onCart, onWish, wished, products }) {
   const heroBanner = store.banners[0];
   return (
-    <div className="space-y-10 sm:space-y-14">
-      <section className="mx-auto grid max-w-7xl gap-4 px-4 py-4 sm:gap-8 sm:py-8 lg:grid-cols-[1.08fr_0.92fr] lg:px-8">
-        <div className="relative flex min-h-[360px] flex-col justify-end overflow-hidden rounded-[1.8rem] bg-gradient-to-br from-glowza-plum via-glowza-pink to-glowza-hot p-5 text-white shadow-glow sm:min-h-[520px] sm:rounded-[2rem] sm:p-7 lg:p-10">
+    <div className="space-y-7 sm:space-y-14">
+      <section className="mx-auto grid max-w-7xl gap-4 px-4 py-3 sm:gap-8 sm:py-8 lg:grid-cols-[1.08fr_0.92fr] lg:px-8">
+        <div className="relative hidden min-h-[360px] flex-col justify-end overflow-hidden rounded-[1.8rem] bg-gradient-to-br from-glowza-plum via-glowza-pink to-glowza-hot p-5 text-white shadow-glow sm:flex sm:min-h-[520px] sm:rounded-[2rem] sm:p-7 lg:p-10">
           <div className="absolute right-5 top-5 grid h-12 w-12 place-items-center rounded-2xl bg-white/15 text-white backdrop-blur">
             <Sparkles size={24} />
           </div>
@@ -453,19 +450,19 @@ function HomePage({ store, setActive, setCategory, onOpenProduct, onCart, onWish
           </div>
         </div>
         <button
-          className="overflow-hidden rounded-[1.8rem] bg-white p-0 text-left shadow-glow sm:rounded-[2rem]"
+          className="overflow-hidden rounded-[1.4rem] bg-white p-0 text-left shadow-glow sm:rounded-[2rem]"
           onClick={() => {
             if (heroBanner?.link?.startsWith('/products') || heroBanner?.link?.startsWith('/shop')) setActive('Shop');
             if (heroBanner?.link?.startsWith('/categories')) setActive('Categories');
           }}
         >
           {heroBanner?.image ? (
-            <img src={heroBanner.image} alt={heroBanner.title} className="h-auto w-full object-cover sm:h-[520px]" />
+            <img src={heroBanner.image} alt={heroBanner.title} className="aspect-[1.85] w-full object-cover sm:aspect-auto sm:h-[520px]" />
           ) : (
-            <div className="grid h-[220px] place-items-center bg-gradient-to-br from-pink-100 to-purple-100 p-8 text-center sm:h-[520px] sm:p-10">
+            <div className="grid aspect-[1.85] place-items-center bg-gradient-to-br from-pink-100 to-purple-100 p-6 text-center sm:aspect-auto sm:h-[520px] sm:p-10">
               <div>
-                <p className="text-sm font-black uppercase text-glowza-pink">Glowza Deals</p>
-                <h2 className="mt-3 text-2xl font-black text-glowza-plum sm:text-4xl">New arrivals are waiting.</h2>
+                <p className="text-xs font-black uppercase text-glowza-pink sm:text-sm">Glowza Deals</p>
+                <h2 className="mt-2 text-xl font-black text-glowza-plum sm:mt-3 sm:text-4xl">New arrivals are waiting.</h2>
               </div>
             </div>
           )}

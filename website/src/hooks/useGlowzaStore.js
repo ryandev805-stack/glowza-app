@@ -44,7 +44,7 @@ export function useGlowzaStore() {
   const [wishlist, setWishlist] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [rotationSeed, setRotationSeed] = useState(() => Math.floor(Date.now() / (10 * 60 * 1000)));
+  const [rotationSeed] = useState(() => Math.floor(Date.now() / (10 * 60 * 1000)));
 
   const subtotal = useMemo(
     () => cart.reduce((total, item) => total + Number(item.product.price || 0) * item.quantity, 0),
@@ -57,13 +57,6 @@ export function useGlowzaStore() {
 
   useEffect(() => {
     void loadCatalog();
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setRotationSeed(Math.floor(Date.now() / (10 * 60 * 1000)));
-    }, 30000);
-    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -107,9 +100,9 @@ export function useGlowzaStore() {
         cursor: productCursor,
       });
       setProducts((current) => {
-        const byId = new Map(current.map((product) => [product.id, product]));
-        productPage.products.forEach((product) => byId.set(product.id, product));
-        return rankProducts([...byId.values()], rotationSeed);
+        const existingIds = new Set(current.map((product) => product.id));
+        const nextProducts = rankProducts(productPage.products, rotationSeed).filter((product) => !existingIds.has(product.id));
+        return [...current, ...nextProducts];
       });
       setProductCursor(productPage.cursor);
       setHasMoreProducts(productPage.hasMore);
