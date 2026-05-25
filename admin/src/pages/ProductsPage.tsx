@@ -9,6 +9,8 @@ import { syncMarkazProduct } from '../services/markazSyncService';
 import { scrapeProduct } from '../services/scraperService';
 import type { Category, Product } from '../types';
 import { useCollection } from '../hooks/useCollection';
+import { CompetitorPriceModal } from '../components/CompetitorPriceModal';
+
 
 const emptyProduct: Omit<Product, 'id'> = {
   name: '',
@@ -361,6 +363,8 @@ export function ProductEditorPage({
   const [scraping, setScraping] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [scrapeError, setScrapeError] = useState('');
+  const [showOptimizer, setShowOptimizer] = useState(false);
+
 
   const calculatedDiscount = useMemo(
     () => calcDiscount(Number(form.price) || 0, Number(form.oldPrice) || 0),
@@ -609,12 +613,24 @@ export function ProductEditorPage({
               <p>Discount is calculated automatically from old price and sale price.</p>
             </div>
           </div>
+          <div className="inline-actions" style={{ marginBottom: '14px', alignItems: 'center' }}>
+            <button 
+              type="button" 
+              className="ghost" 
+              disabled={!form.name || form.name.length < 3}
+              onClick={() => setShowOptimizer(true)}
+            >
+              🔍 Compare & Optimize Competitor Prices
+            </button>
+            {!form.name && <small style={{ marginLeft: '8px' }}>Provide a product name first to compare prices.</small>}
+          </div>
           <div className="form-grid compact">
             <label>Sale Price<input required type="number" min="0" value={form.price} onChange={(event) => setForm({ ...form, price: Number(event.target.value) })} /></label>
             <label>Old Price<input type="number" min="0" value={form.oldPrice || 0} onChange={(event) => setForm({ ...form, oldPrice: Number(event.target.value) })} /></label>
             <label>Discount<input readOnly value={`${calculatedDiscount}%`} /></label>
           </div>
         </section>
+
 
         <section className="editor-section">
           <div className="section-title">
@@ -725,7 +741,23 @@ export function ProductEditorPage({
           {form.sourceUrl && <a className="ghost-link" href={form.sourceUrl} target="_blank" rel="noreferrer">Open Markaz Source</a>}
         </div>
       </aside>
+      {showOptimizer && (
+        <CompetitorPriceModal
+          productTitle={form.name}
+          baseCost={form.markazPrice || form.price}
+          currentPrice={form.price}
+          onClose={() => setShowOptimizer(false)}
+          onApply={(newPrice, newOldPrice) => {
+            setForm((current) => ({
+              ...current,
+              price: newPrice,
+              oldPrice: newOldPrice,
+            }));
+          }}
+        />
+      )}
     </section>
+
   );
 }
 
