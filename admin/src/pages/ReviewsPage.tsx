@@ -1,10 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { CheckCircle2, EyeOff, RefreshCcw, Search, Star, Trash2 } from 'lucide-react';
 import { deleteReview, listOrders, listProducts, listReviews, listUsers, updateReviewStatus } from '../services/firestoreService';
 import type { Order, Product, Review, User } from '../types';
 import { useCollection } from '../hooks/useCollection';
 
 const reviewStatuses = ['pending', 'approved', 'hidden', 'all'] as const;
+const pageSize = 12;
 
 export function ReviewsPage() {
   const reviews = useCollection<Review>(useCallback(() => listReviews(), []));
@@ -14,6 +16,7 @@ export function ReviewsPage() {
   const [status, setStatus] = useState<(typeof reviewStatuses)[number]>('all');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState('');
+  const [page, setPage] = useState(1);
 
   const productById = useMemo(() => new Map(products.items.map((product) => [product.id, product])), [products.items]);
   const orderById = useMemo(() => new Map(orders.items.map((order) => [order.id, order])), [orders.items]);
@@ -27,7 +30,9 @@ export function ReviewsPage() {
     const statusMatches = status === 'all' || review.status === status;
     return statusMatches && text.includes(query.toLowerCase());
   });
-  const selected = reviews.items.find((review) => review.id === selectedId) || filtered[0] || null;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pagedReviews = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const selected = reviews.items.find((review) => review.id === selectedId) || null;
   const selectedProduct = selected ? productById.get(selected.productId) : null;
   const selectedOrder = selected ? orderById.get(selected.orderId) : null;
   const selectedUser = selected ? userById.get(selected.userId) : null;
@@ -37,6 +42,14 @@ export function ReviewsPage() {
     approved: reviews.items.filter((review) => review.status === 'approved').length,
     hidden: reviews.items.filter((review) => review.status === 'hidden').length,
   };
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, status]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
 
   async function refreshAll() {
     await Promise.all([reviews.refresh(), products.refresh(), orders.refresh(), users.refresh()]);
@@ -72,7 +85,6 @@ export function ReviewsPage() {
         <Metric title="Total" value={reviews.items.length} detail="all reviews" />
       </div>
 
-      <div className="management-grid">
       <section className="panel">
         <div className="toolbar">
           <div>
@@ -97,7 +109,7 @@ export function ReviewsPage() {
         {reviews.error && <p className="error">{reviews.error}</p>}
 
         <div className="review-stack">
-          {filtered.map((review) => {
+          {pagedReviews.map((review) => {
             const product = productById.get(review.productId);
             return (
               <button
@@ -120,65 +132,73 @@ export function ReviewsPage() {
           })}
           {filtered.length === 0 && <p className="muted">No reviews match this filter.</p>}
         </div>
+
+        <div className="pagination">
+          <button className="ghost" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
+          <span>Page {page} of {totalPages}</span>
+          <button className="ghost" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>Next</button>
+        </div>
       </section>
 
-      <aside className="panel detail-panel">
-        {selected ? (
-          <>
-            <div className="panel-head">
-              <div>
-                <span className="eyebrow">Review Detail</span>
-                <h2>{selected.customerName || selectedUser?.name || 'Glowza customer'}</h2>
-                <p>{selected.status} - {selected.rating}/5 rating</p>
-              </div>
-              <span className={`pill status-pill-${selected.status}`}>{selected.status}</span>
+      {selected && (
+        <AdminModal onClose={() => setSelectedId('')}>
+          <div className="panel-head">
+            <div>
+              <span className="eyebrow">Review Detail</span>
+              <h2>{selected.customerName || selectedUser?.name || 'Glowza customer'}</h2>
+              <p>{selected.status} - {selected.rating}/5 rating</p>
             </div>
-
-            <div className="review-rating">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star key={star} size={28} fill={selected.rating >= star ? 'currentColor' : 'none'} />
-              ))}
-            </div>
-
-            <blockquote className="review-quote">{selected.comment}</blockquote>
-
-            <div className="detail-grid">
-              <div><span>Product</span><strong>{selectedProduct?.name || 'Missing product'}</strong></div>
-              <div><span>Customer Phone</span><strong>{selectedUser?.phone || selectedOrder?.customerPhone || 'Unknown'}</strong></div>
-              <div><span>Order</span><strong>{selectedOrder?.orderNumber || selected.orderId}</strong></div>
-              <div><span>Order Status</span><strong>{selectedOrder?.status || 'Unknown'}</strong></div>
-            </div>
-
-            {selectedProduct && (
-              <article className="data-card">
-                {selectedProduct.image ? <img src={selectedProduct.image} alt="" /> : <div className="empty-thumb">P</div>}
-                <div className="data-main">
-                  <strong>{selectedProduct.name}</strong>
-                  <span>{selectedProduct.brand || 'Glowza'} - PKR {Number(selectedProduct.price || 0).toLocaleString('en-PK')}</span>
-                  <div className="mini-pills">
-                    <span>{selectedProduct.reviewCount || 0} public reviews</span>
-                    <span>{Number(selectedProduct.rating || 0).toFixed(1)} rating</span>
-                  </div>
-                </div>
-              </article>
-            )}
-
-            <div className="row-actions stacked-actions">
-              <button disabled={selected.status === 'approved'} onClick={() => void changeStatus(selected, 'approved')}><CheckCircle2 size={17} /> Approve</button>
-              <button className="ghost" disabled={selected.status === 'hidden'} onClick={() => void changeStatus(selected, 'hidden')}><EyeOff size={17} /> Hide</button>
-              <button className="danger" onClick={() => void remove(selected)}><Trash2 size={17} /> Delete Review</button>
-            </div>
-          </>
-        ) : (
-          <div className="empty-state">
-            <Star size={34} />
-            <h2>No review selected</h2>
-            <p>Select a review from the queue to moderate it.</p>
+            <span className={`pill status-pill-${selected.status}`}>{selected.status}</span>
           </div>
-        )}
-      </aside>
-      </div>
+
+          <div className="review-rating">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Star key={star} size={28} fill={selected.rating >= star ? 'currentColor' : 'none'} />
+            ))}
+          </div>
+
+          <blockquote className="review-quote">{selected.comment}</blockquote>
+
+          <div className="detail-grid">
+            <div><span>Product</span><strong>{selectedProduct?.name || 'Missing product'}</strong></div>
+            <div><span>Customer Phone</span><strong>{selectedUser?.phone || selectedOrder?.customerPhone || 'Unknown'}</strong></div>
+            <div><span>Order</span><strong>{selectedOrder?.orderNumber || selected.orderId}</strong></div>
+            <div><span>Order Status</span><strong>{selectedOrder?.status || 'Unknown'}</strong></div>
+          </div>
+
+          {selectedProduct && (
+            <article className="data-card">
+              {selectedProduct.image ? <img src={selectedProduct.image} alt="" /> : <div className="empty-thumb">P</div>}
+              <div className="data-main">
+                <strong>{selectedProduct.name}</strong>
+                <span>{selectedProduct.brand || 'Glowza'} - PKR {Number(selectedProduct.price || 0).toLocaleString('en-PK')}</span>
+                <div className="mini-pills">
+                  <span>{selectedProduct.reviewCount || 0} public reviews</span>
+                  <span>{Number(selectedProduct.rating || 0).toFixed(1)} rating</span>
+                </div>
+              </div>
+            </article>
+          )}
+
+          <div className="row-actions stacked-actions">
+            <button disabled={selected.status === 'approved'} onClick={() => void changeStatus(selected, 'approved')}><CheckCircle2 size={17} /> Approve</button>
+            <button className="ghost" disabled={selected.status === 'hidden'} onClick={() => void changeStatus(selected, 'hidden')}><EyeOff size={17} /> Hide</button>
+            <button className="danger" onClick={() => void remove(selected)}><Trash2 size={17} /> Delete Review</button>
+          </div>
+        </AdminModal>
+      )}
     </section>
+  );
+}
+
+function AdminModal({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  return (
+    <div className="admin-modal-backdrop" role="dialog" aria-modal="true">
+      <div className="admin-modal-panel">
+        <button className="admin-modal-close ghost" onClick={onClose}>Close</button>
+        {children}
+      </div>
+    </div>
   );
 }
 

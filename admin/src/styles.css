@@ -947,6 +947,14 @@ button.review-summary {
   font-weight: 700;
   line-height: 1.45;
   padding: 16px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.reviews-page .panel {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .stacked-actions {
@@ -1892,7 +1900,15 @@ button.review-summary {
   .orders-page .detail-block,
   .orders-page .order-products,
   .orders-page .totals,
-  .orders-page .detail-grid {
+  .orders-page .detail-grid,
+  .reviews-page,
+  .reviews-page .panel,
+  .reviews-page .toolbar,
+  .reviews-page .review-stack,
+  .reviews-page .review-summary,
+  .reviews-page .detail-grid,
+  .reviews-page .data-card,
+  .reviews-page .review-quote {
     width: 100%;
     max-width: 100%;
     min-width: 0;
@@ -1902,27 +1918,40 @@ button.review-summary {
   .orders-page .page-hero,
   .orders-page .metric-card,
   .orders-page .data-card,
-  .orders-page .order-product {
+  .orders-page .order-product,
+  .reviews-page .page-hero,
+  .reviews-page .metric-card,
+  .reviews-page .review-summary {
     max-width: 100%;
     min-width: 0;
   }
 
   .orders-page button,
   .orders-page select,
-  .orders-page .ghost-link {
+  .orders-page .ghost-link,
+  .reviews-page button,
+  .reviews-page select {
     max-width: 100%;
     white-space: normal;
   }
 
-  .orders-page .toolbar-controls {
+  .orders-page .toolbar-controls,
+  .reviews-page .toolbar-controls {
     display: grid;
     grid-template-columns: 1fr;
   }
 
   .orders-page .toolbar-controls input,
-  .orders-page .toolbar-controls select {
+  .orders-page .toolbar-controls select,
+  .reviews-page .toolbar-controls input,
+  .reviews-page .toolbar-controls select {
     width: 100%;
     min-width: 0;
+  }
+
+  .reviews-page .review-summary strong {
+    white-space: normal;
+    line-height: 1.25;
   }
 
   .order-card {

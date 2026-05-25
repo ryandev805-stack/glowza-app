@@ -156,7 +156,7 @@ export async function fetchActiveProductPage({ categoryList, pageSize = 20, curs
   const productSnapshot = await getDocs(query(collection(db, paths.products), ...constraints));
   const products = mapProducts(productSnapshot, categoryList);
   return {
-    products: rankProducts(products),
+    products,
     cursor: productSnapshot.docs[productSnapshot.docs.length - 1] || null,
     hasMore: productSnapshot.docs.length === pageSize,
   };

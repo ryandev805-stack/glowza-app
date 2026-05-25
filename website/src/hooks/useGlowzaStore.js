@@ -80,7 +80,9 @@ export function useGlowzaStore() {
       });
       setCategories(categoryData);
       setBanners(bannerData);
-      setProducts(interleaveProductsByCategory(productPage.products, rotationSeed));
+      setProducts(
+        rankProducts(interleaveProductsByCategory(productPage.products, rotationSeed), rotationSeed),
+      );
       setProductCursor(productPage.cursor);
       setHasMoreProducts(productPage.hasMore);
     } catch (err) {
