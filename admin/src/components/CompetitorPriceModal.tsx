@@ -63,9 +63,10 @@ export function CompetitorPriceModal({
       const imageRequested = mode !== 'text' && Boolean(productImage);
       const imageMatches = Number(data.diagnostics?.imageMatches || 0);
       if (imageRequested && data.diagnostics?.imageProviderConfigured === false) {
-        setNotice('Image search needs SERPAPI_API_KEY in Vercel. Showing title-based marketplace results for now.');
+        setNotice('Image search needs SERPAPI_API_KEY in the glowza-admin Vercel project, Production environment, followed by a redeploy. Showing title-based marketplace results for now.');
       } else if (imageRequested && imageMatches === 0) {
-        setNotice('No visual matches were returned for this image. Title-based marketplace matches are shown below.');
+        const provider = data.diagnostics?.imageProviderKeyName ? ` using ${data.diagnostics.imageProviderKeyName}` : '';
+        setNotice(`No visual matches were returned for this image${provider}. Title-based marketplace matches are shown below.`);
       }
       setHasSearched(true);
     } catch (err: unknown) {

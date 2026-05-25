@@ -15,6 +15,7 @@ export interface CompetitorAnalysisResult {
   diagnostics?: {
     imageSearchRequested?: boolean;
     imageProviderConfigured?: boolean;
+    imageProviderKeyName?: string | null;
     imageMatches?: number;
   };
   results: CompetitorProduct[];

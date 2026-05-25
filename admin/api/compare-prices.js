@@ -16,7 +16,14 @@ const SHOPIFY_STORES = [
   { domain: 'www.sanasafinaz.com', name: 'Sana Safinaz' },
 ];
 
-const SERPAPI_KEY = process.env.SERPAPI_API_KEY || process.env.SERPAPI_KEY || '';
+const SERPAPI_KEY_ENTRY = [
+  ['SERPAPI_API_KEY', process.env.SERPAPI_API_KEY],
+  ['SERPAPI_KEY', process.env.SERPAPI_KEY],
+  ['SERP_API_KEY', process.env.SERP_API_KEY],
+  ['VITE_SERPAPI_API_KEY', process.env.VITE_SERPAPI_API_KEY],
+].find(([, value]) => String(value || '').trim().length > 0);
+const SERPAPI_KEY_NAME = SERPAPI_KEY_ENTRY?.[0] || '';
+const SERPAPI_KEY = String(SERPAPI_KEY_ENTRY?.[1] || '').trim();
 
 const MARKETPLACE_SOURCES = [
   ['daraz.pk', 'Daraz Pakistan'],
@@ -832,6 +839,7 @@ export default async function handler(req, res) {
       diagnostics: {
         imageSearchRequested: Boolean(hasImage),
         imageProviderConfigured: Boolean(SERPAPI_KEY),
+        imageProviderKeyName: SERPAPI_KEY_NAME || null,
         imageMatches,
       },
       results,
