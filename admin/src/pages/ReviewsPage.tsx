@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CheckCircle2, EyeOff, RefreshCcw, Search, Star, Trash2 } from 'lucide-react';
-import { deleteReview, listOrders, listProducts, listReviews, listUsers, updateReviewStatus } from '../services/firestoreService';
+import { clearProductReviews, deleteReview, listOrders, listProducts, listReviews, listUsers, updateReviewStatus } from '../services/firestoreService';
 import type { Order, Product, Review, User } from '../types';
 import { useCollection } from '../hooks/useCollection';
 
@@ -17,6 +17,9 @@ export function ReviewsPage() {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState('');
   const [page, setPage] = useState(1);
+  const [clearing, setClearing] = useState(false);
+  const [message, setMessage] = useState('');
+  const [actionError, setActionError] = useState('');
 
   const productById = useMemo(() => new Map(products.items.map((product) => [product.id, product])), [products.items]);
   const orderById = useMemo(() => new Map(orders.items.map((order) => [order.id, order])), [orders.items]);
@@ -67,6 +70,25 @@ export function ReviewsPage() {
     await refreshAll();
   }
 
+  async function clearEmbeddedReviews() {
+    const confirmed = confirm(
+      'Remove all embedded reviews from every product document? This clears reviews, rating, and reviewCount on products only. The reviews collection is not deleted.',
+    );
+    if (!confirmed) return;
+    setClearing(true);
+    setMessage('');
+    setActionError('');
+    try {
+      const result = await clearProductReviews();
+      setMessage(`Cleared embedded reviews on ${result.productsUpdated} products.`);
+      await refreshAll();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not clear product reviews.');
+    } finally {
+      setClearing(false);
+    }
+  }
+
   return (
     <section className="reviews-page admin-layout">
       <div className="page-hero compact-hero">
@@ -75,8 +97,16 @@ export function ReviewsPage() {
           <h1>Review Moderation</h1>
           <p>Moderate delivered-order reviews, inspect context, and sync approved reviews to product ratings.</p>
         </div>
-        <button onClick={() => void refreshAll()}><RefreshCcw size={17} /> Refresh</button>
+        <div className="actions">
+          <button className="danger ghost" disabled={clearing} onClick={() => void clearEmbeddedReviews()}>
+            <Trash2 size={17} /> {clearing ? 'Clearing...' : 'Clear Product Reviews'}
+          </button>
+          <button onClick={() => void refreshAll()}><RefreshCcw size={17} /> Refresh</button>
+        </div>
       </div>
+
+      {message && <p className="success">{message}</p>}
+      {actionError && <p className="error">{actionError}</p>}
 
       <div className="metric-grid">
         <Metric title="Pending" value={counts.pending} detail="waiting approval" />

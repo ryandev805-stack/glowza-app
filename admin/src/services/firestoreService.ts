@@ -439,6 +439,16 @@ export async function seedDemoSocialProof() {
   );
 }
 
+export async function clearProductReviews() {
+  const response = await fetch('/api/clear-product-reviews', {
+    method: 'POST',
+  });
+  return readApiJson<{ productsUpdated: number }>(
+    response,
+    'Could not clear product reviews',
+  );
+}
+
 export async function listOrders(): Promise<Order[]> {
   const snapshot = await getDocs(query(collection(db, paths.orders), orderBy('createdAt', 'desc')));
   return snapshot.docs.map((doc) => withId<Order>(doc));
