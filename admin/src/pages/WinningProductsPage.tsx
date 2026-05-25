@@ -209,6 +209,7 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
           markazStatus: candidate.markazStatus || '',
           markazVariationId: candidate.markazVariationId || '',
           markazVariationName: candidate.markazVariationName || '',
+          markazVariationOptions: candidate.markazVariationOptions || {},
           markupPercent: 0,
           cutPriceMarkupPercent: 40,
           winningScore: candidate.winningScore,
@@ -384,6 +385,9 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
                   <span>{candidate.images.length} images</span>
                   {candidate.videos.length > 0 && <span>{candidate.videos.length} videos</span>}
                   {candidate.markazVariationName && <span>{candidate.markazVariationName}</span>}
+                  {candidate.markazVariationOptions && Object.entries(candidate.markazVariationOptions).map(([key, value]) => (
+                    <span key={`${candidate.id}-${key}`}>{key}: {value}</span>
+                  ))}
                   {candidate.markazStatus && <span>{candidate.markazStatus}</span>}
                   {candidate.duplicate && <span>Duplicate</span>}
                 </div>

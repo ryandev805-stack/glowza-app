@@ -90,6 +90,7 @@ export default function App() {
   const [authOpen, setAuthOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [directCheckoutItems, setDirectCheckoutItems] = useState(null);
   const [orderDone, setOrderDone] = useState(null);
   const [authAutoShown, setAuthAutoShown] = useState(false);
 
@@ -103,6 +104,14 @@ export default function App() {
     }, 900);
     return () => window.clearTimeout(timer);
   }, [store.user, authAutoShown]);
+
+  useEffect(() => {
+    if (!store.user || !directCheckoutItems?.length || checkoutOpen) return;
+    setAuthOpen(false);
+    setCartOpen(false);
+    setSelectedProduct(null);
+    setCheckoutOpen(true);
+  }, [store.user, directCheckoutItems, checkoutOpen]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -202,13 +211,20 @@ export default function App() {
   }
 
   function openCheckout() {
+    setDirectCheckoutItems(null);
     closePopups();
     setSelectedProduct(null);
     setCheckoutOpen(true);
   }
 
+  function closeCheckout() {
+    setCheckoutOpen(false);
+    setDirectCheckoutItems(null);
+  }
+
   function completeOrder(order) {
     closePopups();
+    setDirectCheckoutItems(null);
     setOrderDone(order);
   }
 
@@ -240,12 +256,13 @@ export default function App() {
   }
 
   function buyNow(product, quantity = 1) {
-    store.addToCart(product, quantity);
+    setDirectCheckoutItems([{ product, quantity }]);
     if (!store.user) {
       openLogin();
       return;
     }
     closePopups();
+    setSelectedProduct(null);
     setCheckoutOpen(true);
   }
 
@@ -315,7 +332,9 @@ export default function App() {
       {checkoutOpen && (
         <CheckoutModal
           store={store}
-          onClose={() => setCheckoutOpen(false)}
+          items={directCheckoutItems || store.cart}
+          isDirectCheckout={Boolean(directCheckoutItems)}
+          onClose={closeCheckout}
           onComplete={(order) => {
             completeOrder(order);
           }}
@@ -328,13 +347,13 @@ export default function App() {
           onClose={closeProduct}
           onCart={(product) => store.addToCart(product)}
           onBuyNow={(product, quantity) => {
-            store.addToCart(product, quantity);
+            setDirectCheckoutItems([{ product, quantity }]);
             closeProduct();
             if (!store.user) {
               openLogin();
               return;
             }
-            openCheckout();
+            setCheckoutOpen(true);
           }}
           onOpenRelated={(product) => openProduct(product, { replace: true })}
           onLogin={openLogin}
@@ -1202,7 +1221,7 @@ function CartModal({ store, onClose, onCheckout }) {
   );
 }
 
-function CheckoutModal({ store, onClose, onComplete }) {
+function CheckoutModal({ store, items, isDirectCheckout = false, onClose, onComplete }) {
   const [form, setForm] = useState({
     fullName: store.checkoutInfo.fullName || store.user?.name || '',
     phone: store.checkoutInfo.phone || store.user?.phone || '',
@@ -1212,11 +1231,16 @@ function CheckoutModal({ store, onClose, onComplete }) {
     nearbyPlace: store.checkoutInfo.nearbyPlace || '',
   });
   const [busy, setBusy] = useState(false);
+  const orderItems = items || [];
+  const subtotal = orderItems.reduce((total, item) => total + Number(item.product.price || 0) * item.quantity, 0);
+  const shippingFee = orderItems.length > 0 ? 250 : 0;
+  const total = subtotal + shippingFee;
+
   async function submit(event) {
     event.preventDefault();
     setBusy(true);
     try {
-      onComplete(await store.placeOrder(form));
+      onComplete(await store.placeOrder(form, orderItems));
     } finally {
       setBusy(false);
     }
@@ -1234,12 +1258,26 @@ function CheckoutModal({ store, onClose, onComplete }) {
         ].map(([field, label]) => (
           <input key={field} className="focus-ring w-full rounded-2xl border border-pink-100 px-4 py-4" required placeholder={label} value={form[field]} onChange={(event) => setForm({ ...form, [field]: event.target.value })} />
         ))}
+        {isDirectCheckout && orderItems.length > 0 && (
+          <div className="rounded-3xl border border-pink-100 bg-white p-3">
+            <p className="mb-3 text-xs font-black uppercase text-glowza-pink">Buying now</p>
+            {orderItems.map((item) => (
+              <div key={item.product.id} className="flex items-center gap-3">
+                <ProductThumb product={item.product} className="h-14 w-14 rounded-xl" />
+                <div className="min-w-0 flex-1">
+                  <strong className="line-clamp-1 text-sm text-glowza-plum">{item.product.name}</strong>
+                  <p className="text-sm font-black text-glowza-pink">{money(item.product.price)} x {item.quantity}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="rounded-3xl bg-pink-50 p-4">
-          <Line label="Subtotal" value={store.subtotal} />
-          <Line label="Delivery" value={store.shippingFee} />
-          <Line label="Total" value={store.total} strong />
+          <Line label="Subtotal" value={subtotal} />
+          <Line label="Delivery" value={shippingFee} />
+          <Line label="Total" value={total} strong />
         </div>
-        <button disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-glowza-pink px-5 py-4 font-bold text-white">
+        <button disabled={busy || orderItems.length === 0} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-glowza-pink px-5 py-4 font-bold text-white disabled:opacity-50">
           <PackageCheck size={18} />
           {busy ? 'Placing...' : 'Place Order'}
         </button>

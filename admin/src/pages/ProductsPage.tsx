@@ -37,6 +37,9 @@ const emptyProduct: Omit<Product, 'id'> = {
   source: '',
   sourceUrl: '',
   markazPrice: 0,
+  markazVariationId: '',
+  markazVariationName: '',
+  markazVariationOptions: {},
   markupPercent: 70,
   cutPriceMarkupPercent: 40,
   needsReview: false,
@@ -305,6 +308,10 @@ export function ProductsPage({
                   <span>Stock {product.stock}</span>
                   <span>{product.isActive ? 'Active' : 'Hidden'}</span>
                   {product.sourceUrl ? <span>Markaz Sync</span> : null}
+                  {product.markazVariationName ? <span>{product.markazVariationName}</span> : null}
+                  {product.markazVariationOptions && Object.entries(product.markazVariationOptions).slice(0, 3).map(([key, value]) => (
+                    <span key={`${product.id}-${key}`}>{key}: {value}</span>
+                  ))}
                   {product.needsReview ? <span>Needs review</span> : null}
                 </div>
                 {product.syncChangeSummary?.length ? <small>Changed: {product.syncChangeSummary.slice(0, 3).join(', ')}</small> : null}
@@ -419,6 +426,10 @@ export function ProductEditorPage({
         brand: scraped.brand || current.brand || 'Markaz',
         source: 'markaz',
         sourceUrl: scraped.sourceUrl || scrapeUrl,
+        markazPrice: Number(scraped.markazPrice || current.markazPrice || 0),
+        markazVariationId: scraped.markazVariationId || current.markazVariationId || '',
+        markazVariationName: scraped.markazVariationName || current.markazVariationName || '',
+        markazVariationOptions: scraped.markazVariationOptions || current.markazVariationOptions || {},
       }));
     } catch (error) {
       setScrapeError(error instanceof Error ? error.message : 'Scrape failed');
@@ -736,6 +747,10 @@ export function ProductEditorPage({
             <span>Stock {form.stock || 0}</span>
             <span>{form.images?.length || 0} images</span>
             <span>{form.videos?.length || 0} videos</span>
+            {form.markazVariationName && <span>{form.markazVariationName}</span>}
+            {form.markazVariationOptions && Object.entries(form.markazVariationOptions).slice(0, 3).map(([key, value]) => (
+              <span key={key}>{key}: {value}</span>
+            ))}
             {form.sourceUrl && <span>Markaz linked</span>}
           </div>
           {form.sourceUrl && <a className="ghost-link" href={form.sourceUrl} target="_blank" rel="noreferrer">Open Markaz Source</a>}

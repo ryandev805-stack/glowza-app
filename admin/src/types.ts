@@ -59,6 +59,7 @@ export type Product = {
   markazStatus?: string;
   markazVariationId?: string;
   markazVariationName?: string;
+  markazVariationOptions?: Record<string, string>;
   sourceSyncedAt?: FirestoreDate;
   sourceImages?: string[];
   sourceVideos?: string[];
@@ -83,6 +84,7 @@ export type WinningProductCandidate = {
   videos: string[];
   markazVariationId?: string;
   markazVariationName?: string;
+  markazVariationOptions?: Record<string, string>;
   brand: string;
   stock: number;
   markazStatus?: string;

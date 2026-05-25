@@ -239,19 +239,26 @@ export function useGlowzaStore() {
     localStorage.setItem(checkoutKey, JSON.stringify(info));
   }
 
-  async function placeOrder(info) {
+  async function placeOrder(info, orderItems = cart) {
     if (!user) throw new Error('Login is required');
+    const orderSubtotal = orderItems.reduce((totalValue, item) => (
+      totalValue + Number(item.product.price || 0) * item.quantity
+    ), 0);
+    const orderShippingFee = orderItems.length > 0 ? 250 : 0;
+    const orderDiscount = 0;
     const created = await createOrder({
       user,
       checkout: info,
-      items: cart,
-      subtotal,
-      shippingFee,
-      discount,
-      total,
+      items: orderItems,
+      subtotal: orderSubtotal,
+      shippingFee: orderShippingFee,
+      discount: orderDiscount,
+      total: orderSubtotal + orderShippingFee - orderDiscount,
     });
     saveCheckout(info);
-    setCart([]);
+    if (orderItems === cart) {
+      setCart([]);
+    }
     await refreshOrders(user.id);
     return created;
   }

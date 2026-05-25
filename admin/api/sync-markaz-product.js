@@ -68,6 +68,58 @@ function firstImage(value) {
   return value || '';
 }
 
+function variationOptionsFrom(raw) {
+  const options = {};
+  const add = (key, value) => {
+    const cleanKey = cleanText(key).toLowerCase();
+    const cleanValue = cleanText(value);
+    if (!cleanKey || !cleanValue) return;
+    if (['id', 'price', 'prepaidprice', 'saleprice', 'stock', 'availablestock', 'quantity', 'status'].includes(cleanKey)) return;
+    options[cleanKey] = cleanValue;
+  };
+
+  add('size', raw.size || raw.Size);
+  add('color', raw.color || raw.colour || raw.Color || raw.Colour);
+
+  [
+    raw.attributes,
+    raw.attributeValues,
+    raw.options,
+    raw.optionValues,
+    raw.variantOptions,
+    raw.variationOptions,
+    raw.properties,
+  ].forEach((container) => {
+    if (Array.isArray(container)) {
+      container.forEach((item) => {
+        if (!item || typeof item !== 'object') return;
+        add(item.name || item.key || item.label || item.title || item.attributeName || item.optionName, item.value || item.optionValue || item.attributeValue || item.label || item.title);
+      });
+      return;
+    }
+    if (container && typeof container === 'object') {
+      Object.entries(container).forEach(([key, value]) => {
+        if (value && typeof value === 'object') {
+          add(key, value.name || value.value || value.label || value.title);
+        } else {
+          add(key, value);
+        }
+      });
+    }
+  });
+
+  return options;
+}
+
+function variationNameFrom(raw, index, options) {
+  const explicit = cleanText(raw.name || raw.title || raw.variantName || raw.variationName || raw.skuName);
+  if (explicit) return explicit;
+  const optionName = Object.entries(options)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join(', ');
+  return optionName || `Variation ${index + 1}`;
+}
+
 function extractImages(decoded, jsonLd) {
   const jsonLdImages = Array.isArray(jsonLd?.image)
     ? jsonLd.image.map(firstImage)
@@ -139,13 +191,17 @@ function extractVariations(decoded) {
     const parsed = JSON.parse(arrayText);
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .map((raw, index) => ({
-        id: String(raw.id || raw.variationId || raw.sku || raw.supplierProductCode || index),
-        name: cleanText(raw.name || raw.title || raw.variantName || raw.size || raw.color || `Variation ${index + 1}`),
-        markazPrice: Number(raw.prePaidPrice || raw.price || raw.salePrice || 0),
-        stock: Number(raw.availableStock ?? raw.stock ?? raw.quantity ?? 0) || 0,
-        status: String(raw.status || ''),
-      }))
+      .map((raw, index) => {
+        const options = variationOptionsFrom(raw);
+        return {
+          id: String(raw.id || raw.variationId || raw.sku || raw.supplierProductCode || index),
+          name: variationNameFrom(raw, index, options),
+          options,
+          markazPrice: Number(raw.prePaidPrice || raw.price || raw.salePrice || 0),
+          stock: Number(raw.availableStock ?? raw.stock ?? raw.quantity ?? 0) || 0,
+          status: String(raw.status || ''),
+        };
+      })
       .filter((item) => item.markazPrice > 0);
   } catch {
     return [];
@@ -286,6 +342,8 @@ export default async function handler(req, res) {
           markazPrice: matchedVariation.markazPrice,
           stock: matchedVariation.stock,
           markazStatus: matchedVariation.status || markaz.markazStatus,
+          markazVariationName: matchedVariation.name,
+          markazVariationOptions: matchedVariation.options || {},
         }
       : markaz;
     const pricing = buildPricing(activeMarkaz.markazPrice);
@@ -298,6 +356,8 @@ export default async function handler(req, res) {
       discount: pricing.discount,
       stock: activeMarkaz.stock,
       markazStatus: activeMarkaz.markazStatus,
+      markazVariationName: activeMarkaz.markazVariationName || current.markazVariationName || '',
+      markazVariationOptions: activeMarkaz.markazVariationOptions || current.markazVariationOptions || {},
     };
     const labels = {
       name: 'Name changed',
@@ -308,6 +368,8 @@ export default async function handler(req, res) {
       discount: 'Discount recalculated',
       stock: 'Stock changed',
       markazStatus: 'Markaz status changed',
+      markazVariationName: 'Variation name changed',
+      markazVariationOptions: 'Variation options changed',
     };
     const { changes, summary } = collectChanges(current, compared, labels);
     const needsReview = summary.length > 0;

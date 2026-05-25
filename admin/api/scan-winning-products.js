@@ -195,6 +195,60 @@ function firstImage(value) {
   return value || '';
 }
 
+function variationOptionsFrom(raw) {
+  const options = {};
+  const add = (key, value) => {
+    const cleanKey = cleanText(key).toLowerCase();
+    const cleanValue = cleanText(value);
+    if (!cleanKey || !cleanValue) return;
+    if (['id', 'price', 'prepaidprice', 'saleprice', 'stock', 'availablestock', 'quantity', 'status'].includes(cleanKey)) return;
+    options[cleanKey] = cleanValue;
+  };
+
+  add('size', raw.size || raw.Size);
+  add('color', raw.color || raw.colour || raw.Color || raw.Colour);
+
+  const containers = [
+    raw.attributes,
+    raw.attributeValues,
+    raw.options,
+    raw.optionValues,
+    raw.variantOptions,
+    raw.variationOptions,
+    raw.properties,
+  ];
+
+  containers.forEach((container) => {
+    if (Array.isArray(container)) {
+      container.forEach((item) => {
+        if (!item || typeof item !== 'object') return;
+        add(item.name || item.key || item.label || item.title || item.attributeName || item.optionName, item.value || item.optionValue || item.attributeValue || item.label || item.title);
+      });
+      return;
+    }
+    if (container && typeof container === 'object') {
+      Object.entries(container).forEach(([key, value]) => {
+        if (value && typeof value === 'object') {
+          add(key, value.name || value.value || value.label || value.title);
+        } else {
+          add(key, value);
+        }
+      });
+    }
+  });
+
+  return options;
+}
+
+function variationNameFrom(raw, index, options) {
+  const explicit = cleanText(raw.name || raw.title || raw.variantName || raw.variationName || raw.skuName);
+  if (explicit) return explicit;
+  const optionName = Object.entries(options)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join(', ');
+  return optionName || `Variation ${index + 1}`;
+}
+
 function parseJsonLd(html) {
   const scripts = [...html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
   for (const script of scripts) {
@@ -359,9 +413,11 @@ function readBracketValue(source, key) {
 function normalizeVariation(raw, index) {
   const markazPrice = Number(raw.prePaidPrice || raw.price || raw.salePrice || 0);
   const image = firstImage(raw.image || raw.imageUrl || raw.thumbnail || raw.thumbnailUrl || raw.url || '');
+  const options = variationOptionsFrom(raw);
   return {
     id: String(raw.id || raw.variationId || raw.sku || raw.supplierProductCode || index),
-    name: cleanText(raw.name || raw.title || raw.variantName || raw.size || raw.color || `Variation ${index + 1}`),
+    name: variationNameFrom(raw, index, options),
+    options,
     markazPrice,
     image,
     stock: Number(raw.availableStock ?? raw.stock ?? raw.quantity ?? 0) || 0,
@@ -384,6 +440,11 @@ function extractVariations(decoded) {
         return {
           id: text.match(/"id":("?[^",}]+")/)?.[1]?.replace(/"/g, '') || String(index),
           name: cleanText(text.match(/"name":"([^"]+)"/)?.[1] || text.match(/"title":"([^"]+)"/)?.[1] || `Variation ${index + 1}`),
+          options: {
+            ...(text.match(/"size":"([^"]+)"/)?.[1] ? { size: cleanText(text.match(/"size":"([^"]+)"/)?.[1]) } : {}),
+            ...(text.match(/"color":"([^"]+)"/)?.[1] ? { color: cleanText(text.match(/"color":"([^"]+)"/)?.[1]) } : {}),
+            ...(text.match(/"colour":"([^"]+)"/)?.[1] ? { color: cleanText(text.match(/"colour":"([^"]+)"/)?.[1]) } : {}),
+          },
           markazPrice: numberFrom(text.match(/"prePaidPrice":([0-9.]+)/)?.[1]) || numberFrom(text.match(/"price":([0-9.]+)/)?.[1]),
           image: text.match(/"(?:image|imageUrl|thumbnail|thumbnailUrl|url)":"(https?:\/\/[^"]+)"/)?.[1] || '',
           stock: numberFrom(text.match(/"availableStock":([0-9.]+)/)?.[1]),
@@ -443,6 +504,9 @@ function expandVariationProducts(product) {
   if (!product.variations?.length) return [product];
   return product.variations.map((variation) => {
     const images = unique([variation.image, ...product.images].filter(Boolean));
+    const optionText = Object.entries(variation.options || {})
+      .map(([key, value]) => `${key}: ${value}`)
+      .join(', ');
     return {
       ...product,
       name: `${product.name} - ${variation.name}`,
@@ -453,7 +517,8 @@ function expandVariationProducts(product) {
       markazStatus: variation.status || product.markazStatus,
       markazVariationId: variation.id,
       markazVariationName: variation.name,
-      description: `${product.description || product.name}\n\nVariation: ${variation.name}`,
+      markazVariationOptions: variation.options || {},
+      description: `${product.description || product.name}\n\nVariation: ${variation.name}${optionText ? ` (${optionText})` : ''}`,
     };
   });
 }
