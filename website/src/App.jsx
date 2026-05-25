@@ -111,6 +111,10 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [query, store.categories.length]);
 
+  useEffect(() => {
+    void store.loadCategoryProducts(category);
+  }, [category, store.categories.length]);
+
   const rankedCatalog = useMemo(
     () => store.rankedProducts(store.products),
     [store.products, store.rotationSeed],
@@ -118,7 +122,11 @@ export default function App() {
   const isSearchMode = query.trim().length > 0;
 
   const filteredProducts = useMemo(() => {
-    const sourceProducts = isSearchMode ? store.rankedProducts(store.searchResults) : rankedCatalog;
+    const sourceProducts = isSearchMode
+      ? store.rankedProducts(store.searchResults)
+      : category === 'all'
+        ? rankedCatalog
+        : store.rankedProducts(store.categoryResults);
     const products = sourceProducts.filter((product) => {
       const matchesCategory = category === 'all' || product.categoryId === category || product.categoryName === category;
       return matchesCategory;
@@ -130,11 +138,7 @@ export default function App() {
       if (sort === 'new') return Number(b.createdAt?.seconds || 0) - Number(a.createdAt?.seconds || 0);
       return 0;
     });
-  }, [rankedCatalog, store.searchResults, store.rotationSeed, isSearchMode, category, sort]);
-
-  const bestSellers = rankedCatalog.filter((product) => product.isBestSeller).slice(0, 8);
-  const newArrivals = rankedCatalog.filter((product) => product.isNew).slice(0, 8);
-  const flashSale = rankedCatalog.filter((product) => product.isFlashSale).slice(0, 8);
+  }, [rankedCatalog, store.searchResults, store.categoryResults, store.rotationSeed, isSearchMode, category, sort]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -264,9 +268,7 @@ export default function App() {
             onCart={buyNow}
             onWish={(product) => requireLogin(() => store.toggleWishlist(product.id))}
             wished={(product) => store.wishlist.has(product.id)}
-            bestSellers={bestSellers}
-            newArrivals={newArrivals}
-            flashSale={flashSale}
+            products={rankedCatalog}
           />
         )}
         {active === 'Shop' && (
@@ -285,6 +287,7 @@ export default function App() {
             suggestions={store.searchSuggestions}
             searching={store.searching}
             isSearchMode={isSearchMode}
+            categoryLoading={store.categoryLoading}
           />
         )}
         {active === 'Categories' && (
@@ -419,7 +422,7 @@ function NavIcon({ item, size = 18 }) {
   return <UserRound size={size} />;
 }
 
-function HomePage({ store, setActive, setCategory, onOpenProduct, onCart, onWish, wished, bestSellers, newArrivals, flashSale }) {
+function HomePage({ store, setActive, setCategory, onOpenProduct, onCart, onWish, wished, products }) {
   const heroBanner = store.banners[0];
   return (
     <div className="space-y-10 sm:space-y-14">
@@ -432,8 +435,8 @@ function HomePage({ store, setActive, setCategory, onOpenProduct, onCart, onWish
             <Sparkles size={14} />
             Pakistan's everyday online store
           </span>
-          <h1 className="max-w-3xl text-4xl font-black leading-none sm:text-6xl lg:text-7xl">Everything feels easier on Glowza.</h1>
-          <p className="mt-4 max-w-2xl text-sm font-semibold text-white/80 sm:mt-5 sm:text-lg">Shop fashion, beauty, jewellery, home, kitchen, accessories, gadgets, and daily essentials with a smooth checkout experience.</p>
+          <h1 className="max-w-3xl text-3xl font-black leading-none sm:text-5xl lg:text-6xl">Everything feels easier on Glowza.</h1>
+          <p className="mt-4 max-w-2xl text-sm font-semibold text-white/80 sm:mt-5 sm:text-base">Shop fashion, beauty, jewellery, home, kitchen, accessories, gadgets, and daily essentials with a smooth checkout experience.</p>
           <button className="mt-5 flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 text-left font-bold text-glowza-pink shadow-sm sm:hidden" onClick={() => setActive('Shop')}>
             <span className="inline-flex items-center gap-2"><Search size={18} /> Search products</span>
             <ChevronRight size={18} />
@@ -469,9 +472,7 @@ function HomePage({ store, setActive, setCategory, onOpenProduct, onCart, onWish
         </button>
       </section>
       <CategoryRail store={store} setActive={setActive} setCategory={setCategory} />
-      <ProductSection title="Flash Sale" products={flashSale} fallback={store.rankedProducts(store.products).slice(0, 8)} onOpenProduct={onOpenProduct} onCart={onCart} onWish={onWish} wished={wished} />
-      <ProductSection title="Best Sellers" products={bestSellers} fallback={store.rankedProducts(store.products).slice(0, 8)} onOpenProduct={onOpenProduct} onCart={onCart} onWish={onWish} wished={wished} />
-      <ProductSection title="New Arrivals" products={newArrivals} fallback={store.rankedProducts(store.products).slice(0, 8)} onOpenProduct={onOpenProduct} onCart={onCart} onWish={onWish} wished={wished} />
+      <HomeProducts products={products} onOpenProduct={onOpenProduct} onCart={onCart} onWish={onWish} wished={wished} />
     </div>
   );
 }
@@ -506,20 +507,20 @@ function CategoryRail({ store, setActive, setCategory }) {
   );
 }
 
-function ProductSection({ title, products, fallback, onOpenProduct, onCart, onWish, wished }) {
-  const list = products.length ? products : fallback;
+function HomeProducts({ products, onOpenProduct, onCart, onWish, wished }) {
+  const list = products.slice(0, 24);
   if (!list.length) return null;
   return (
     <section className="mx-auto max-w-7xl px-4 lg:px-8">
       <div className="mb-4 flex items-end justify-between sm:mb-5">
         <div>
-          <p className="text-xs font-black uppercase text-glowza-pink sm:text-sm">Glowza Picks</p>
-          <h2 className="text-2xl font-black text-glowza-plum sm:text-3xl">{title}</h2>
+          <p className="text-[11px] font-black uppercase text-glowza-pink sm:text-xs">Glowza Picks</p>
+          <h2 className="text-xl font-black text-glowza-plum sm:text-2xl">All Products</h2>
         </div>
       </div>
-      <div className="hide-scrollbar flex snap-x gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
         {list.map((product) => (
-          <div key={product.id} className="w-[168px] shrink-0 snap-start md:w-auto">
+          <div key={product.id}>
             <ProductCard product={product} wished={wished(product)} onOpen={() => onOpenProduct(product)} onCart={() => onCart(product)} onWish={() => onWish(product)} />
           </div>
         ))}
@@ -528,10 +529,10 @@ function ProductSection({ title, products, fallback, onOpenProduct, onCart, onWi
   );
 }
 
-function ShopPage({ store, products, query, setQuery, category, setCategory, sort, setSort, onOpenProduct, onCart, onWish, suggestions = [], searching = false, isSearchMode = false }) {
+function ShopPage({ store, products, query, setQuery, category, setCategory, sort, setSort, onOpenProduct, onCart, onWish, suggestions = [], searching = false, isSearchMode = false, categoryLoading = false }) {
   const loadMoreRef = useRef(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const canAutoLoadMore = !isSearchMode && products.length > 0 && store.hasMoreProducts;
+  const canAutoLoadMore = category === 'all' && !isSearchMode && products.length > 0 && store.hasMoreProducts;
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -607,9 +608,9 @@ function ShopPage({ store, products, query, setQuery, category, setCategory, sor
           </div>
         </Modal>
       )}
-      {store.loading && <p className="rounded-2xl bg-white p-6 font-bold text-glowza-pink">Loading products...</p>}
+      {(store.loading || categoryLoading) && <p className="rounded-2xl bg-white p-6 font-bold text-glowza-pink">Loading products...</p>}
       {store.error && <p className="rounded-2xl bg-red-50 p-6 font-bold text-red-600">{store.error}</p>}
-      {!store.loading && !searching && products.length === 0 && (
+      {!store.loading && !categoryLoading && !searching && products.length === 0 && (
         <div className="rounded-[1.5rem] bg-white p-8 text-center shadow-glow">
           <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-pink-50 text-glowza-pink">
             <Search size={26} />

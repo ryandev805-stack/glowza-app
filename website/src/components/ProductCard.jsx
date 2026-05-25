@@ -32,11 +32,11 @@ export function ProductCard({ product, wished, onOpen, onCart, onWish }) {
       </div>
       <div className="flex flex-1 flex-col gap-2.5 p-3 sm:gap-3 sm:p-4">
         <button className="min-w-0 bg-transparent p-0 text-left" onClick={onOpen}>
-          <h3 className="line-clamp-2 min-h-9 text-sm font-extrabold leading-snug text-glowza-plum sm:min-h-10 sm:text-base">{product.name}</h3>
+          <h3 className="line-clamp-2 min-h-8 text-[13px] font-bold leading-snug text-glowza-plum sm:min-h-9 sm:text-sm">{product.name}</h3>
         </button>
         <div className="mt-auto flex items-end justify-between gap-2 sm:gap-3">
           <div>
-            <strong className="text-base text-glowza-pink sm:text-lg">{money(product.price)}</strong>
+            <strong className="text-sm text-glowza-pink sm:text-base">{money(product.price)}</strong>
             {Number(product.oldPrice || 0) > Number(product.price || 0) && (
               <p className="text-xs text-slate-400 line-through">{money(product.oldPrice)}</p>
             )}
@@ -45,7 +45,7 @@ export function ProductCard({ product, wished, onOpen, onCart, onWish }) {
             <p className="inline-flex items-center gap-1"><Star size={12} fill="currentColor" className="text-glowza-gold" /> {Number(product.rating || 0).toFixed(1)}</p>
           </div>
         </div>
-        <button className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-glowza-pink px-3 py-2.5 text-sm font-bold text-white transition hover:bg-glowza-wine sm:px-4 sm:py-3 sm:text-base" onClick={onCart}>
+        <button className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-glowza-pink px-3 py-2.5 text-xs font-bold text-white transition hover:bg-glowza-wine sm:px-4 sm:py-3 sm:text-sm" onClick={onCart}>
           <PackageCheck size={16} />
           Buy Now
         </button>

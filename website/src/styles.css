@@ -45,6 +45,7 @@ body {
   overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
   font-family: 'Gopher', ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
 }
 
 button,

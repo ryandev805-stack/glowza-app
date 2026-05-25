@@ -132,6 +132,23 @@ export async function fetchActiveProductPage({ categoryList, pageSize = 20, curs
   };
 }
 
+export async function fetchActiveProductsByCategory({ categoryId, categoryList, pageSize = 160 }) {
+  if (!categoryId || categoryId === 'all') {
+    const page = await fetchActiveProductPage({ categoryList, pageSize });
+    return page.products;
+  }
+
+  const snapshot = await getDocs(
+    query(
+      collection(db, paths.products),
+      where('isActive', '==', true),
+      where('categoryId', '==', categoryId),
+      limit(pageSize),
+    ),
+  );
+  return rankProducts(mapProducts(snapshot, categoryList));
+}
+
 export async function searchActiveProducts({ text, categoryList, pageSize = 60 }) {
   const terms = searchTerms(text);
   if (terms.length === 0) {

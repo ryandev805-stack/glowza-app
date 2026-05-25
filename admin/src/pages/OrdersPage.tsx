@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { CheckCircle2, Clipboard, PackageCheck, Phone, RefreshCcw, Truck } from 'lucide-react';
 import { listOrders, updateOrderStatus } from '../services/firestoreService';
 import type { Order } from '../types';
@@ -23,6 +24,8 @@ export function OrdersPage({
   const { items, loading, error, refresh } = useCollection<Order>(loader);
   const [statusFilter, setStatusFilter] = useState('all');
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 12;
   const selected = useMemo(
     () => items.find((order) => order.id === orderId) || null,
     [items, orderId],
@@ -33,6 +36,8 @@ export function OrdersPage({
     const statusMatches = statusFilter === 'all' || order.status === statusFilter;
     return text.includes(query.toLowerCase()) && statusMatches;
   });
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const pagedOrders = filteredOrders.slice((page - 1) * pageSize, page * pageSize);
   const pending = items.filter((order) => order.status === 'pending').length;
   const revenue = items.reduce((total, order) => total + Number(order.total || 0), 0);
   const statusCounts = statuses.reduce<Record<string, number>>((counts, status) => {
@@ -45,6 +50,14 @@ export function OrdersPage({
       onBack();
     }
   }, [orderId, loading, selected, onBack]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
 
   async function setStatus(id: string, status: string) {
     await updateOrderStatus(id, status);
@@ -78,8 +91,8 @@ export function OrdersPage({
         <Metric title="Cancelled" value={items.filter((order) => order.status === 'cancelled').length} detail="cancelled orders" />
       </div>
 
-      <section className={selected ? 'orders-layout' : 'panel'}>
-        <div className={selected ? 'panel' : ''}>
+      <section className="panel">
+        <div>
           <div className="toolbar">
             <div>
               <h2>Orders</h2>
@@ -106,7 +119,7 @@ export function OrdersPage({
           {error && <p className="error">{error}</p>}
 
           <div className="data-list">
-            {filteredOrders.map((order) => (
+            {pagedOrders.map((order) => (
               <article key={order.id} className={`data-card order-card ${order.id === selected?.id ? 'selected' : ''}`}>
                 <div className="status-dot" data-status={order.status} />
                 <div className="data-main">
@@ -130,10 +143,15 @@ export function OrdersPage({
               </article>
             ))}
           </div>
+          <div className="pagination">
+            <button className="ghost" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
+            <span>Page {page} of {totalPages}</span>
+            <button className="ghost" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>Next</button>
+          </div>
         </div>
 
         {selected && (
-          <aside className="panel detail-panel">
+          <AdminModal onClose={onBack}>
             <div className="panel-head">
               <div>
                 <span className="eyebrow">Order Detail</span>
@@ -193,10 +211,21 @@ export function OrdersPage({
               <div><span>Discount</span><strong>{money(selected.discount)}</strong></div>
               <div><span>Total</span><strong>{money(selected.total)}</strong></div>
             </div>
-          </aside>
+          </AdminModal>
         )}
       </section>
     </section>
+  );
+}
+
+function AdminModal({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  return (
+    <div className="admin-modal-backdrop" role="dialog" aria-modal="true">
+      <div className="admin-modal-panel">
+        <button className="admin-modal-close ghost" onClick={onClose}>Close</button>
+        {children}
+      </div>
+    </div>
   );
 }
 

@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { BadgeCheck, Ban, RefreshCcw, Save, Search, ShoppingBag, Sparkles, UserRound } from 'lucide-react';
 import { listOrders, listUsers, seedDemoSocialProof, updateUserProfile } from '../services/firestoreService';
 import type { Order, User } from '../types';
@@ -24,8 +25,10 @@ export function UsersPage() {
   const [seeding, setSeeding] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 12;
 
-  const selected = users.items.find((user) => user.id === selectedId) || users.items[0] || null;
+  const selected = users.items.find((user) => user.id === selectedId) || null;
   const selectedOrders = useMemo(
     () => selected ? orders.items.filter((order) => order.userId === selected.id) : [],
     [orders.items, selected],
@@ -47,9 +50,19 @@ export function UsersPage() {
     const roleMatches = roleFilter === 'all' || user.role === roleFilter || (roleFilter === 'blocked' && user.isBlocked);
     return roleMatches && text.includes(query.toLowerCase());
   });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pagedUsers = filtered.slice((page - 1) * pageSize, page * pageSize);
   const customers = users.items.filter((user) => user.role !== 'admin').length;
   const blocked = users.items.filter((user) => user.isBlocked).length;
   const repeatCustomers = users.items.filter((user) => (statsByUser.get(user.id)?.orders || 0) > 1).length;
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, roleFilter]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
 
   async function saveUser(input: Partial<Pick<User, 'name' | 'role' | 'isBlocked'>>) {
     if (!selected) return;
@@ -103,7 +116,6 @@ export function UsersPage() {
         <Metric title="Orders" value={orders.items.length} detail="all customer orders" />
       </div>
 
-      <div className="management-grid">
       <section className="panel">
         <div className="toolbar">
           <div>
@@ -128,7 +140,7 @@ export function UsersPage() {
         {users.error && <p className="error">{users.error}</p>}
 
         <div className="user-grid">
-          {filtered.map((user) => {
+          {pagedUsers.map((user) => {
             const stats = statsByUser.get(user.id) || { orders: 0, spend: 0 };
             return (
               <button
@@ -151,9 +163,15 @@ export function UsersPage() {
           })}
           {filtered.length === 0 && <p className="muted">No users match this filter.</p>}
         </div>
+        <div className="pagination">
+          <button className="ghost" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
+          <span>Page {page} of {totalPages}</span>
+          <button className="ghost" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>Next</button>
+        </div>
       </section>
 
-      <aside className="panel detail-panel">
+      {selected && (
+      <AdminModal onClose={() => setSelectedId('')}>
         {selected ? (
           <>
             <div className="panel-head">
@@ -222,9 +240,20 @@ export function UsersPage() {
             <p>Select a customer from the directory to manage their profile.</p>
           </div>
         )}
-      </aside>
-      </div>
+      </AdminModal>
+      )}
     </section>
+  );
+}
+
+function AdminModal({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  return (
+    <div className="admin-modal-backdrop" role="dialog" aria-modal="true">
+      <div className="admin-modal-panel">
+        <button className="admin-modal-close ghost" onClick={onClose}>Close</button>
+        {children}
+      </div>
+    </div>
   );
 }
 

@@ -4,6 +4,7 @@ import {
   fetchActiveBanners,
   fetchActiveCategories,
   fetchActiveProductPage,
+  fetchActiveProductsByCategory,
   rankProducts,
   fetchProductById,
   fetchOrdersForUser,
@@ -33,6 +34,8 @@ export function useGlowzaStore() {
   const [searchResults, setSearchResults] = useState([]);
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [categoryResults, setCategoryResults] = useState([]);
+  const [categoryLoading, setCategoryLoading] = useState(false);
   const [productCursor, setProductCursor] = useState(null);
   const [hasMoreProducts, setHasMoreProducts] = useState(false);
   const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
@@ -151,6 +154,27 @@ export function useGlowzaStore() {
     }
   }
 
+  async function loadCategoryProducts(categoryId) {
+    if (!categoryId || categoryId === 'all') {
+      setCategoryResults([]);
+      return;
+    }
+    setCategoryLoading(true);
+    setError('');
+    try {
+      const result = await fetchActiveProductsByCategory({
+        categoryId,
+        categoryList: categories,
+      });
+      setCategoryResults(rankProducts(result, rotationSeed));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load category products');
+      setCategoryResults([]);
+    } finally {
+      setCategoryLoading(false);
+    }
+  }
+
   function rankedProducts(list = products) {
     return rankProducts(list, rotationSeed);
   }
@@ -252,6 +276,8 @@ export function useGlowzaStore() {
     searchResults,
     searchSuggestions,
     searching,
+    categoryResults,
+    categoryLoading,
     orders,
     cart,
     wishlist,
@@ -270,6 +296,7 @@ export function useGlowzaStore() {
     loadMoreProducts,
     loadProductById,
     searchCatalog,
+    loadCategoryProducts,
     rankedProducts,
     trackProductView,
     login,
