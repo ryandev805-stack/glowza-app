@@ -11,6 +11,14 @@ function money(value: number | undefined) {
   return `PKR ${Number(value || 0).toLocaleString('en-PK')}`;
 }
 
+function orderTax(order: Order) {
+  return Number(order.taxFee || 0);
+}
+
+function orderCodHandling(order: Order) {
+  return Number(order.codHandlingFee || 0);
+}
+
 export function OrdersPage({
   orderId,
   onView,
@@ -208,6 +216,8 @@ export function OrdersPage({
             <div className="totals">
               <div><span>Subtotal</span><strong>{money(selected.subtotal)}</strong></div>
               <div><span>Shipping</span><strong>{money(selected.shippingFee)}</strong></div>
+              <div><span>Tax</span><strong>{money(orderTax(selected))}</strong></div>
+              <div><span>COD handling</span><strong>{money(orderCodHandling(selected))}</strong></div>
               <div><span>Discount</span><strong>{money(selected.discount)}</strong></div>
               <div><span>Total</span><strong>{money(selected.total)}</strong></div>
             </div>

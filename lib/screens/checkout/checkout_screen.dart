@@ -109,7 +109,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 12),
             ],
             _Total(label: 'Subtotal', value: state.subtotal),
-            _Total(label: 'Delivery', value: state.deliveryCharges),
+            _Total(label: 'Shipping', value: state.shippingFee),
+            _Total(label: 'Tax', value: state.taxFee),
+            _Total(label: 'COD handling', value: state.codHandlingFee),
             if (gameDiscount > 0)
               _Total(label: 'Glow Points Discount', value: -gameDiscount),
             _Total(label: 'Grand Total', value: payableTotal, strong: true),

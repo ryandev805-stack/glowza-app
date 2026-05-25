@@ -68,7 +68,10 @@ class AppState extends ChangeNotifier {
   bool get isLoggedIn => _user != null;
   int get cartCount => _cart.fold(0, (total, item) => total + item.quantity);
   int get subtotal => _cart.fold(0, (total, item) => total + item.lineTotal);
-  int get deliveryCharges => _cart.isEmpty ? 0 : AppConstants.deliveryCharges;
+  int get shippingFee => _cart.isEmpty ? 0 : AppConstants.shippingFee;
+  int get taxFee => _cart.isEmpty ? 0 : AppConstants.taxFee;
+  int get codHandlingFee => _cart.isEmpty ? 0 : AppConstants.codHandlingFee;
+  int get deliveryCharges => shippingFee + taxFee + codHandlingFee;
   int get grandTotal => subtotal + deliveryCharges;
   int get gamePoints => _gamePoints;
   int get gamePointsEarnedToday => _gamePointsEarnedToday;
@@ -420,7 +423,9 @@ class AppState extends ChangeNotifier {
         paymentMethod: 'Cash on Delivery',
         paymentStatus: 'unpaid',
         subtotal: subtotal,
-        shippingFee: deliveryCharges,
+        shippingFee: shippingFee,
+        taxFee: taxFee,
+        codHandlingFee: codHandlingFee,
         discount: safeGameDiscount,
         total: grandTotal - safeGameDiscount,
         totalItems: cartCount,

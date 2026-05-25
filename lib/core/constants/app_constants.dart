@@ -6,7 +6,10 @@ class AppConstants {
   static const goldAccent = 0xFFD4AF37;
   static const deepPlum = 0xFF3A1028;
   static const roseWine = 0xFF8E174A;
-  static const deliveryCharges = 250;
+  static const shippingFee = 150;
+  static const taxFee = 50;
+  static const codHandlingFee = 50;
+  static const deliveryCharges = shippingFee + taxFee + codHandlingFee;
   static const gamePointsPerRupee = 10;
   static const gameEstimatedRewardedAdRevenuePkr = 10.0;
   static const gameUserRewardShare = 0.20;

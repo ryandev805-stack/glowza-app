@@ -374,7 +374,17 @@ export async function fetchOrdersForUser(userId) {
     .sort((a, b) => Number(b.createdAt?.seconds || 0) - Number(a.createdAt?.seconds || 0));
 }
 
-export async function createOrder({ user, checkout, items, subtotal, shippingFee, discount, total }) {
+export async function createOrder({
+  user,
+  checkout,
+  items,
+  subtotal,
+  shippingFee,
+  taxFee = 0,
+  codHandlingFee = 0,
+  discount,
+  total,
+}) {
   const orderNumber = `GLZ-${String(Date.now()).slice(-8)}`;
   const products = items.map((item) => ({
     productId: item.product.id,
@@ -392,6 +402,8 @@ export async function createOrder({ user, checkout, items, subtotal, shippingFee
     paymentStatus: 'unpaid',
     subtotal,
     shippingFee,
+    taxFee,
+    codHandlingFee,
     discount,
     total,
     totalItems: items.reduce((count, item) => count + item.quantity, 0),

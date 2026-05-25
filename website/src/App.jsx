@@ -1209,7 +1209,9 @@ function CartModal({ store, onClose, onCheckout }) {
         ))}
         <div className="rounded-3xl bg-pink-50 p-4">
           <Line label="Subtotal" value={store.subtotal} />
-          <Line label="Delivery" value={store.shippingFee} />
+          <Line label="Shipping" value={store.shippingFee} />
+          <Line label="Tax" value={store.taxFee} />
+          <Line label="COD handling" value={store.codHandlingFee} />
           <Line label="Total" value={store.total} strong />
         </div>
         <button disabled={store.cart.length === 0} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-glowza-pink px-5 py-4 font-bold text-white disabled:opacity-50" onClick={onCheckout}>
@@ -1233,8 +1235,10 @@ function CheckoutModal({ store, items, isDirectCheckout = false, onClose, onComp
   const [busy, setBusy] = useState(false);
   const orderItems = items || [];
   const subtotal = orderItems.reduce((total, item) => total + Number(item.product.price || 0) * item.quantity, 0);
-  const shippingFee = orderItems.length > 0 ? 250 : 0;
-  const total = subtotal + shippingFee;
+  const shippingFee = orderItems.length > 0 ? 150 : 0;
+  const taxFee = orderItems.length > 0 ? 50 : 0;
+  const codHandlingFee = orderItems.length > 0 ? 50 : 0;
+  const total = subtotal + shippingFee + taxFee + codHandlingFee;
 
   async function submit(event) {
     event.preventDefault();
@@ -1274,7 +1278,9 @@ function CheckoutModal({ store, items, isDirectCheckout = false, onClose, onComp
         )}
         <div className="rounded-3xl bg-pink-50 p-4">
           <Line label="Subtotal" value={subtotal} />
-          <Line label="Delivery" value={shippingFee} />
+          <Line label="Shipping" value={shippingFee} />
+          <Line label="Tax" value={taxFee} />
+          <Line label="COD handling" value={codHandlingFee} />
           <Line label="Total" value={total} strong />
         </div>
         <button disabled={busy || orderItems.length === 0} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-glowza-pink px-5 py-4 font-bold text-white disabled:opacity-50">

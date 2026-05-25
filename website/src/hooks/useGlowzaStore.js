@@ -32,6 +32,9 @@ function mergeCatalogProducts(current, incoming) {
 const userKey = 'glowza_web_user';
 const checkoutKey = 'glowza_web_checkout';
 const productsPerCategory = 16;
+const shippingCharge = 150;
+const taxCharge = 50;
+const codHandlingCharge = 50;
 
 export function useGlowzaStore() {
   const [user, setUser] = useState(() => {
@@ -64,9 +67,11 @@ export function useGlowzaStore() {
     () => cart.reduce((total, item) => total + Number(item.product.price || 0) * item.quantity, 0),
     [cart],
   );
-  const shippingFee = cart.length > 0 ? 250 : 0;
+  const shippingFee = cart.length > 0 ? shippingCharge : 0;
+  const taxFee = cart.length > 0 ? taxCharge : 0;
+  const codHandlingFee = cart.length > 0 ? codHandlingCharge : 0;
   const discount = 0;
-  const total = subtotal + shippingFee - discount;
+  const total = subtotal + shippingFee + taxFee + codHandlingFee - discount;
   const cartCount = cart.reduce((count, item) => count + item.quantity, 0);
   const products = useMemo(
     () => shuffleDirectListing(catalogProducts, rotationSeed),
@@ -244,7 +249,9 @@ export function useGlowzaStore() {
     const orderSubtotal = orderItems.reduce((totalValue, item) => (
       totalValue + Number(item.product.price || 0) * item.quantity
     ), 0);
-    const orderShippingFee = orderItems.length > 0 ? 250 : 0;
+    const orderShippingFee = orderItems.length > 0 ? shippingCharge : 0;
+    const orderTaxFee = orderItems.length > 0 ? taxCharge : 0;
+    const orderCodHandlingFee = orderItems.length > 0 ? codHandlingCharge : 0;
     const orderDiscount = 0;
     const created = await createOrder({
       user,
@@ -252,8 +259,10 @@ export function useGlowzaStore() {
       items: orderItems,
       subtotal: orderSubtotal,
       shippingFee: orderShippingFee,
+      taxFee: orderTaxFee,
+      codHandlingFee: orderCodHandlingFee,
       discount: orderDiscount,
-      total: orderSubtotal + orderShippingFee - orderDiscount,
+      total: orderSubtotal + orderShippingFee + orderTaxFee + orderCodHandlingFee - orderDiscount,
     });
     saveCheckout(info);
     if (orderItems === cart) {
@@ -302,6 +311,8 @@ export function useGlowzaStore() {
     error,
     subtotal,
     shippingFee,
+    taxFee,
+    codHandlingFee,
     discount,
     total,
     cartCount,

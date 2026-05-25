@@ -14,6 +14,8 @@ class GlowzaOrder {
     required this.paymentStatus,
     required this.subtotal,
     required this.shippingFee,
+    required this.taxFee,
+    required this.codHandlingFee,
     required this.discount,
     required this.total,
     required this.totalItems,
@@ -36,6 +38,8 @@ class GlowzaOrder {
   final String paymentStatus;
   final int subtotal;
   final int shippingFee;
+  final int taxFee;
+  final int codHandlingFee;
   final int discount;
   final int total;
   final int totalItems;
@@ -63,6 +67,8 @@ class GlowzaOrder {
       paymentStatus: data['paymentStatus'] as String? ?? '',
       subtotal: (data['subtotal'] as num?)?.round() ?? 0,
       shippingFee: (data['shippingFee'] as num?)?.round() ?? 0,
+      taxFee: (data['taxFee'] as num?)?.round() ?? 0,
+      codHandlingFee: (data['codHandlingFee'] as num?)?.round() ?? 0,
       discount: (data['discount'] as num?)?.round() ?? 0,
       total: (data['total'] as num?)?.round() ?? 0,
       totalItems: (data['totalItems'] as num?)?.round() ?? 0,
@@ -93,6 +99,8 @@ class GlowzaOrder {
       'paymentStatus': paymentStatus,
       'subtotal': subtotal,
       'shippingFee': shippingFee,
+      'taxFee': taxFee,
+      'codHandlingFee': codHandlingFee,
       'discount': discount,
       'total': total,
       'totalItems': totalItems,

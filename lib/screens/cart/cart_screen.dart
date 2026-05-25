@@ -123,9 +123,11 @@ class CartScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 _TotalRow(label: 'Subtotal', value: appState.subtotal),
+                _TotalRow(label: 'Shipping', value: appState.shippingFee),
+                _TotalRow(label: 'Tax', value: appState.taxFee),
                 _TotalRow(
-                  label: 'Delivery charges',
-                  value: appState.deliveryCharges,
+                  label: 'COD handling',
+                  value: appState.codHandlingFee,
                 ),
                 const Divider(height: 28),
                 _TotalRow(

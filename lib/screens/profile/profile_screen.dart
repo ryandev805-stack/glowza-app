@@ -867,6 +867,8 @@ Future<void> _showOrderDetails(BuildContext context, GlowzaOrder order) {
               const Divider(height: 24),
               _AmountRow(label: 'Subtotal', value: order.subtotal),
               _AmountRow(label: 'Shipping', value: order.shippingFee),
+              _AmountRow(label: 'Tax', value: order.taxFee),
+              _AmountRow(label: 'COD handling', value: order.codHandlingFee),
               _AmountRow(label: 'Discount', value: -order.discount),
               _AmountRow(label: 'Total', value: order.total, isTotal: true),
             ],

@@ -163,6 +163,8 @@ export type Order = {
   paymentStatus: string;
   subtotal: number;
   shippingFee: number;
+  taxFee?: number;
+  codHandlingFee?: number;
   discount: number;
   total: number;
   totalItems: number;
