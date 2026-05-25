@@ -744,6 +744,7 @@ export function ProductEditorPage({
       {showOptimizer && (
         <CompetitorPriceModal
           productTitle={form.name}
+          productImage={form.image || form.images?.[0] || ''}
           baseCost={form.markazPrice || form.price}
           currentPrice={form.price}
           onClose={() => setShowOptimizer(false)}
