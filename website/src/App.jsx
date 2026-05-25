@@ -240,11 +240,13 @@ export default function App() {
   }
 
   function buyNow(product, quantity = 1) {
-    requireLogin(() => {
-      store.addToCart(product, quantity);
-      closePopups();
-      setCheckoutOpen(true);
-    });
+    store.addToCart(product, quantity);
+    if (!store.user) {
+      openLogin();
+      return;
+    }
+    closePopups();
+    setCheckoutOpen(true);
   }
 
   return (
@@ -325,11 +327,15 @@ export default function App() {
           store={store}
           onClose={closeProduct}
           onCart={(product) => store.addToCart(product)}
-          onBuyNow={(product, quantity) => requireLogin(() => {
+          onBuyNow={(product, quantity) => {
             store.addToCart(product, quantity);
             closeProduct();
+            if (!store.user) {
+              openLogin();
+              return;
+            }
             openCheckout();
-          })}
+          }}
           onOpenRelated={(product) => openProduct(product, { replace: true })}
           onLogin={openLogin}
         />
