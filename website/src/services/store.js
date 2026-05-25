@@ -66,6 +66,36 @@ export function rankProducts(products, seed = productRotationSeed()) {
   });
 }
 
+export function interleaveProductsByCategory(products, seed = productRotationSeed()) {
+  const buckets = new Map();
+  products.forEach((product) => {
+    const key = product.categoryId || product.categoryName || 'uncategorized';
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(product);
+  });
+
+  const categories = [...buckets.keys()].sort(
+    (a, b) => hashNumber(`${a}-${seed}-category`) - hashNumber(`${b}-${seed}-category`),
+  );
+  categories.forEach((category) => {
+    buckets.set(category, rankProducts(buckets.get(category), seed));
+  });
+
+  const result = [];
+  let hasProducts = true;
+  while (hasProducts) {
+    hasProducts = false;
+    categories.forEach((category) => {
+      const bucket = buckets.get(category);
+      if (bucket?.length) {
+        result.push(bucket.shift());
+        hasProducts = true;
+      }
+    });
+  }
+  return result;
+}
+
 export async function loginOrCreateUser({ name, phone }) {
   const snapshot = await getDocs(
     query(collection(db, paths.users), where('phone', '==', phone), limit(1)),

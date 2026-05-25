@@ -5,6 +5,7 @@ import {
   fetchActiveCategories,
   fetchActiveProductPage,
   fetchActiveProductsByCategory,
+  interleaveProductsByCategory,
   rankProducts,
   fetchProductById,
   fetchOrdersForUser,
@@ -79,7 +80,7 @@ export function useGlowzaStore() {
       });
       setCategories(categoryData);
       setBanners(bannerData);
-      setProducts(rankProducts(productPage.products, rotationSeed));
+      setProducts(interleaveProductsByCategory(productPage.products, rotationSeed));
       setProductCursor(productPage.cursor);
       setHasMoreProducts(productPage.hasMore);
     } catch (err) {
@@ -101,7 +102,8 @@ export function useGlowzaStore() {
       });
       setProducts((current) => {
         const existingIds = new Set(current.map((product) => product.id));
-        const nextProducts = rankProducts(productPage.products, rotationSeed).filter((product) => !existingIds.has(product.id));
+        const nextProducts = interleaveProductsByCategory(productPage.products, rotationSeed)
+          .filter((product) => !existingIds.has(product.id));
         return [...current, ...nextProducts];
       });
       setProductCursor(productPage.cursor);
