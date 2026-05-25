@@ -16,6 +16,8 @@ const SHOPIFY_STORES = [
   { domain: 'www.sanasafinaz.com', name: 'Sana Safinaz' },
 ];
 
+const SERPAPI_KEY = process.env.SERPAPI_API_KEY || process.env.SERPAPI_KEY || '';
+
 const IMAGE_SEARCH_DOMAINS = [
   'daraz.pk',
   'bagallery.com',
@@ -516,6 +518,59 @@ async function fetchGoogleLensUploadByUrl(imageUrl, signal) {
   return results;
 }
 
+async function fetchSerpApiGoogleLens(imageUrl, signal) {
+  if (!SERPAPI_KEY) return [];
+
+  const url = new URL('https://serpapi.com/search.json');
+  url.searchParams.set('engine', 'google_lens');
+  url.searchParams.set('url', imageUrl);
+  url.searchParams.set('type', 'products');
+  url.searchParams.set('hl', 'en');
+  url.searchParams.set('country', 'pk');
+  url.searchParams.set('api_key', SERPAPI_KEY);
+
+  try {
+    const res = await fetch(url.toString(), {
+      signal,
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const groups = [
+      ...(data.products || []),
+      ...(data.visual_matches || []),
+      ...(data.exact_matches || []),
+    ];
+    const seen = new Set();
+    const results = [];
+    groups.forEach((item) => {
+      const link = item.link || item.source || item.url || '';
+      if (!link || seen.has(link)) return;
+      seen.add(link);
+      const priceText =
+        item.price?.extracted_value ||
+        item.price?.value ||
+        item.extracted_price ||
+        item.price ||
+        item.snippet ||
+        '';
+      const price = typeof priceText === 'number' ? priceText : priceFromContext(String(priceText));
+      results.push({
+        title: stripHtml(item.title || item.name || item.source || ''),
+        price,
+        url: link,
+        image: item.thumbnail || item.image || '',
+        source: sourceFromUrl(link) || stripHtml(item.source || ''),
+        foundBy: 'image',
+      });
+    });
+    return results.filter((result) => result.url);
+  } catch (err) {
+    console.error('[serpapi-google-lens]', err.message);
+    return [];
+  }
+}
+
 async function fetchBingImageSearch(imageUrl, signal) {
   const results = [];
   const seen = new Set();
@@ -577,6 +632,7 @@ async function fetchAllAdapters(query, imageUrl) {
 
     // Run image search in parallel when imageUrl is provided
     if (imageUrl) {
+      tasks.push(fetchSerpApiGoogleLens(imageUrl, controller.signal));
       tasks.push(fetchGoogleLensUploadByUrl(imageUrl, controller.signal));
       tasks.push(fetchGoogleImageSearch(imageUrl, controller.signal));
       tasks.push(fetchBingImageSearch(imageUrl, controller.signal));
