@@ -66,7 +66,10 @@ export function rankProducts(products, seed = productRotationSeed()) {
   });
 }
 
-export function interleaveProductsByCategory(products, seed = productRotationSeed()) {
+/** Home + Shop (all products): one seeded-random pick per category, then repeat until empty. */
+export function shuffleDirectListing(products, seed = productRotationSeed()) {
+  if (!products.length) return [];
+
   const buckets = new Map();
   products.forEach((product) => {
     const key = product.categoryId || product.categoryName || 'uncategorized';
@@ -77,23 +80,32 @@ export function interleaveProductsByCategory(products, seed = productRotationSee
   const categories = [...buckets.keys()].sort(
     (a, b) => hashNumber(`${a}-${seed}-category`) - hashNumber(`${b}-${seed}-category`),
   );
-  categories.forEach((category) => {
-    buckets.set(category, rankProducts(buckets.get(category), seed));
-  });
 
   const result = [];
-  let hasProducts = true;
-  while (hasProducts) {
-    hasProducts = false;
-    categories.forEach((category) => {
+  let round = 0;
+
+  while (true) {
+    let addedThisRound = false;
+    for (const category of categories) {
       const bucket = buckets.get(category);
-      if (bucket?.length) {
-        result.push(bucket.shift());
-        hasProducts = true;
-      }
-    });
+      if (!bucket?.length) continue;
+      const pickIndex = Math.min(
+        bucket.length - 1,
+        Math.floor(hashNumber(`${seed}-${category}-pick-${round}`) * bucket.length),
+      );
+      result.push(bucket.splice(pickIndex, 1)[0]);
+      addedThisRound = true;
+    }
+    if (!addedThisRound) break;
+    round += 1;
   }
+
   return result;
+}
+
+/** @deprecated Use shuffleDirectListing */
+export function interleaveProductsByCategory(products, seed = productRotationSeed()) {
+  return shuffleDirectListing(products, seed);
 }
 
 export async function loginOrCreateUser({ name, phone }) {

@@ -5,7 +5,7 @@ import {
   fetchActiveCategories,
   fetchActiveProductPage,
   fetchActiveProductsByCategory,
-  interleaveProductsByCategory,
+  shuffleDirectListing,
   rankProducts,
   fetchProductById,
   fetchOrdersForUser,
@@ -15,6 +15,18 @@ import {
   submitReview,
   trackProductView,
 } from '../services/store';
+
+function mergeCatalogProducts(current, incoming) {
+  const ids = new Set(current.map((product) => product.id));
+  const merged = [...current];
+  incoming.forEach((product) => {
+    if (!ids.has(product.id)) {
+      ids.add(product.id);
+      merged.push(product);
+    }
+  });
+  return merged;
+}
 
 const userKey = 'glowza_web_user';
 const checkoutKey = 'glowza_web_checkout';
@@ -31,7 +43,7 @@ export function useGlowzaStore() {
   });
   const [categories, setCategories] = useState([]);
   const [banners, setBanners] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [catalogProducts, setCatalogProducts] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -55,6 +67,10 @@ export function useGlowzaStore() {
   const discount = 0;
   const total = subtotal + shippingFee - discount;
   const cartCount = cart.reduce((count, item) => count + item.quantity, 0);
+  const products = useMemo(
+    () => shuffleDirectListing(catalogProducts, rotationSeed),
+    [catalogProducts, rotationSeed],
+  );
 
   useEffect(() => {
     void loadCatalog();
@@ -80,9 +96,7 @@ export function useGlowzaStore() {
       });
       setCategories(categoryData);
       setBanners(bannerData);
-      setProducts(
-        rankProducts(interleaveProductsByCategory(productPage.products, rotationSeed), rotationSeed),
-      );
+      setCatalogProducts(productPage.products);
       setProductCursor(productPage.cursor);
       setHasMoreProducts(productPage.hasMore);
     } catch (err) {
@@ -102,12 +116,7 @@ export function useGlowzaStore() {
         pageSize: productPageSize,
         cursor: productCursor,
       });
-      setProducts((current) => {
-        const existingIds = new Set(current.map((product) => product.id));
-        const nextProducts = interleaveProductsByCategory(productPage.products, rotationSeed)
-          .filter((product) => !existingIds.has(product.id));
-        return [...current, ...nextProducts];
-      });
+      setCatalogProducts((current) => mergeCatalogProducts(current, productPage.products));
       setProductCursor(productPage.cursor);
       setHasMoreProducts(productPage.hasMore);
     } catch (err) {
@@ -122,7 +131,9 @@ export function useGlowzaStore() {
     if (existing) return existing;
     const product = await fetchProductById(productId, categories);
     if (product) {
-      setProducts((current) => current.some((item) => item.id === product.id) ? current : [product, ...current]);
+      setCatalogProducts((current) => (
+        current.some((item) => item.id === product.id) ? current : [...current, product]
+      ));
     }
     return product;
   }

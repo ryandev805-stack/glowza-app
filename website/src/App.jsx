@@ -115,19 +115,23 @@ export default function App() {
     void store.loadCategoryProducts(category);
   }, [category, store.categories.length]);
 
-  const rankedCatalog = store.products;
+  const directListing = store.products;
   const isSearchMode = query.trim().length > 0;
+  const useDirectListing = !isSearchMode && category === 'all';
 
   const filteredProducts = useMemo(() => {
     const sourceProducts = isSearchMode
       ? store.searchResults
       : category === 'all'
-        ? rankedCatalog
+        ? directListing
         : store.categoryResults;
     const products = sourceProducts.filter((product) => {
       const matchesCategory = category === 'all' || product.categoryId === category || product.categoryName === category;
       return matchesCategory;
     });
+    if (useDirectListing && sort === 'popular') {
+      return products;
+    }
     return [...products].sort((a, b) => {
       if (sort === 'price-low') return Number(a.price || 0) - Number(b.price || 0);
       if (sort === 'price-high') return Number(b.price || 0) - Number(a.price || 0);
@@ -135,7 +139,7 @@ export default function App() {
       if (sort === 'new') return Number(b.createdAt?.seconds || 0) - Number(a.createdAt?.seconds || 0);
       return 0;
     });
-  }, [rankedCatalog, store.searchResults, store.categoryResults, isSearchMode, category, sort]);
+  }, [directListing, store.searchResults, store.categoryResults, isSearchMode, useDirectListing, category, sort]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -265,7 +269,7 @@ export default function App() {
             onCart={buyNow}
             onWish={(product) => requireLogin(() => store.toggleWishlist(product.id))}
             wished={(product) => store.wishlist.has(product.id)}
-            products={rankedCatalog}
+            products={directListing}
           />
         )}
         {active === 'Shop' && (
