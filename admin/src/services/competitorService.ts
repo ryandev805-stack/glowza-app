@@ -4,18 +4,30 @@ export interface CompetitorProduct {
   url: string;
   image: string;
   source: string;
+  relevance?: number;
+  foundBy?: 'text' | 'image';
 }
 
 export interface CompetitorAnalysisResult {
   query: string;
+  imageUrl?: string | null;
+  total: number;
   results: CompetitorProduct[];
 }
 
-export async function analyzeCompetitorPrices(query: string): Promise<CompetitorAnalysisResult> {
+export interface CompetitorSearchParams {
+  query?: string;
+  imageUrl?: string;
+  limit?: number;
+}
+
+export async function analyzeCompetitorPrices(
+  params: CompetitorSearchParams,
+): Promise<CompetitorAnalysisResult> {
   const response = await fetch('/api/compare-prices', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify(params),
   });
 
   const body = await response.json();

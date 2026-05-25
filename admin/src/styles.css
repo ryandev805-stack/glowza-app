@@ -705,12 +705,15 @@ button.review-summary {
   flex: 1;
   gap: 4px;
   min-width: 0;
+  overflow: hidden;
 }
 
 .data-main strong,
 .product-row-card strong,
 .category-card strong,
-.user-card strong {
+.user-card strong,
+.review-summary strong,
+.review-summary span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -721,6 +724,8 @@ button.review-summary {
 .product-row-card span,
 .category-card span,
 .user-card span,
+.review-summary strong,
+.review-summary span,
 .review-summary p {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -919,6 +924,7 @@ button.review-summary {
 
 .review-summary {
   align-items: flex-start;
+  overflow: hidden;
 }
 
 .review-summary p {
@@ -2478,4 +2484,3 @@ button.review-summary {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
-
