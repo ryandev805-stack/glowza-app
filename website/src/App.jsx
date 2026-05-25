@@ -784,6 +784,7 @@ function ProductThumb({ product, className = '' }) {
 }
 
 function ProductModal({ product, store, onClose, onBuyNow, onOpenRelated, onLogin }) {
+  const panelRef = useRef(null);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -812,6 +813,9 @@ function ProductModal({ product, store, onClose, onBuyNow, onOpenRelated, onLogi
     setQuantity(1);
     setActiveInfo('description');
     setAdded(false);
+    setReviewOpen(false);
+    panelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product.id, product.image, product.images, product.videos]);
 
   function moveImage(direction) {
@@ -835,7 +839,7 @@ function ProductModal({ product, store, onClose, onBuyNow, onOpenRelated, onLogi
   }
 
   return (
-    <Modal title="Product details" onClose={onClose} full>
+    <Modal title="Product details" onClose={onClose} full panelRef={panelRef}>
       <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr] lg:gap-6">
         <div className="min-w-0 space-y-3">
           <div className="relative overflow-hidden rounded-[1.4rem] bg-gradient-to-br from-pink-50 to-purple-50 sm:rounded-[1.8rem]">
@@ -1035,7 +1039,14 @@ function ProductModal({ product, store, onClose, onBuyNow, onOpenRelated, onLogi
               </div>
               <div className="hide-scrollbar flex gap-3 overflow-x-auto pb-1">
                 {related.map((item) => (
-                  <button key={item.id} className="w-36 shrink-0 rounded-2xl border border-pink-100 bg-white p-2 text-left" onClick={() => onOpenRelated(item)}>
+                  <button
+                    key={item.id}
+                    className="w-36 shrink-0 rounded-2xl border border-pink-100 bg-white p-2 text-left"
+                    onClick={() => {
+                      panelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                      onOpenRelated(item);
+                    }}
+                  >
                     <div className="aspect-square overflow-hidden rounded-xl bg-pink-50">
                       <ProductThumb product={item} className="h-full w-full rounded-none" />
                     </div>
