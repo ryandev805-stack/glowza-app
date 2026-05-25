@@ -25,6 +25,7 @@ export function CompetitorPriceModal({
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<CompetitorProduct[]>([]);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [searchMode, setSearchMode] = useState<SearchMode>(productImage ? 'both' : 'text');
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -48,6 +49,7 @@ export function CompetitorPriceModal({
     abortRef.current = new AbortController();
     setLoading(true);
     setError('');
+    setNotice('');
     setResults([]);
     setHasSearched(false);
 
@@ -58,6 +60,13 @@ export function CompetitorPriceModal({
 
       const data = await analyzeCompetitorPrices(params);
       setResults(data.results);
+      const imageRequested = mode !== 'text' && Boolean(productImage);
+      const imageMatches = Number(data.diagnostics?.imageMatches || 0);
+      if (imageRequested && data.diagnostics?.imageProviderConfigured === false) {
+        setNotice('Image search needs SERPAPI_API_KEY in Vercel. Showing title-based marketplace results for now.');
+      } else if (imageRequested && imageMatches === 0) {
+        setNotice('No visual matches were returned for this image. Title-based marketplace matches are shown below.');
+      }
       setHasSearched(true);
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
@@ -208,6 +217,13 @@ export function CompetitorPriceModal({
               <div className="error-alert">
                 <AlertCircle size={16} />
                 <span>{error}</span>
+              </div>
+            )}
+
+            {notice && !error && (
+              <div className="info-alert">
+                <AlertCircle size={16} />
+                <span>{notice}</span>
               </div>
             )}
 

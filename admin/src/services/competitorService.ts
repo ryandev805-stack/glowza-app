@@ -12,6 +12,11 @@ export interface CompetitorAnalysisResult {
   query: string;
   imageUrl?: string | null;
   total: number;
+  diagnostics?: {
+    imageSearchRequested?: boolean;
+    imageProviderConfigured?: boolean;
+    imageMatches?: number;
+  };
   results: CompetitorProduct[];
 }
 

@@ -146,6 +146,20 @@ function priceFromContext(context) {
   return match ? parseFloat(match[1].replace(/,/g, '')) : 0;
 }
 
+function priceFromAny(value) {
+  if (typeof value === 'number') return value;
+  if (!value) return 0;
+  if (typeof value === 'object') {
+    return (
+      Number(value.extracted_value || 0) ||
+      priceFromAny(value.value) ||
+      priceFromAny(value.price) ||
+      priceFromAny(value.amount)
+    );
+  }
+  return priceFromContext(String(value)) || Number(String(value).replace(/[^0-9.]/g, '')) || 0;
+}
+
 function cleanExternalUrl(rawUrl) {
   try {
     const decoded = decodeURIComponent(String(rawUrl || '').split('&')[0]);
@@ -614,57 +628,61 @@ async function fetchGoogleLensUploadByUrl(imageUrl, signal) {
   return results;
 }
 
-async function fetchSerpApiGoogleLens(imageUrl, signal) {
+async function fetchSerpApiGoogleLens(imageUrl, signal, queryText = '') {
   if (!SERPAPI_KEY) return [];
 
-  const url = new URL('https://serpapi.com/search.json');
-  url.searchParams.set('engine', 'google_lens');
-  url.searchParams.set('url', imageUrl);
-  url.searchParams.set('type', 'products');
-  url.searchParams.set('hl', 'en');
-  url.searchParams.set('country', 'pk');
-  url.searchParams.set('api_key', SERPAPI_KEY);
+  const lensTypes = ['products', 'visual_matches', 'exact_matches'];
+  const settled = await Promise.allSettled(
+    lensTypes.map(async (type) => {
+      const url = new URL('https://serpapi.com/search.json');
+      url.searchParams.set('engine', 'google_lens');
+      url.searchParams.set('url', imageUrl);
+      url.searchParams.set('type', type);
+      url.searchParams.set('hl', 'en');
+      url.searchParams.set('country', 'pk');
+      url.searchParams.set('api_key', SERPAPI_KEY);
+      if (queryText && type !== 'exact_matches') url.searchParams.set('q', queryText);
 
-  try {
-    const res = await fetch(url.toString(), {
-      signal,
-      headers: { Accept: 'application/json' },
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const groups = [
-      ...(data.products || []),
-      ...(data.visual_matches || []),
-      ...(data.exact_matches || []),
-    ];
-    const seen = new Set();
-    const results = [];
-    groups.forEach((item) => {
-      const link = item.link || item.source || item.url || '';
-      if (!link || seen.has(link)) return;
-      seen.add(link);
-      const priceText =
-        item.price?.extracted_value ||
-        item.price?.value ||
-        item.extracted_price ||
-        item.price ||
-        item.snippet ||
-        '';
-      const price = typeof priceText === 'number' ? priceText : priceFromContext(String(priceText));
-      results.push({
-        title: stripHtml(item.title || item.name || item.source || ''),
-        price,
-        url: link,
-        image: item.thumbnail || item.image || '',
-        source: sourceFromUrl(link) || stripHtml(item.source || ''),
-        foundBy: 'image',
+      const res = await fetch(url.toString(), {
+        signal,
+        headers: { Accept: 'application/json' },
       });
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (data.error) {
+        console.error('[serpapi-google-lens]', data.error);
+        return [];
+      }
+      const groups = [
+        ...(data.products || []),
+        ...(data.visual_matches || []),
+        ...(data.exact_matches || []),
+        ...(data.product_results || []),
+        ...(data.shopping_results || []),
+      ];
+      return groups.map((item) => {
+        const link = item.link || item.url || item.source_url || '';
+        return {
+          title: stripHtml(item.title || item.name || item.source || ''),
+          price: priceFromAny(item.price || item.extracted_price || item.snippet),
+          url: link,
+          image: item.thumbnail || item.image || '',
+          source: sourceFromUrl(link) || stripHtml(item.source || ''),
+          foundBy: 'image',
+        };
+      });
+    }),
+  );
+
+  const seen = new Set();
+  return settled
+    .filter(entry => entry.status === 'fulfilled')
+    .flatMap(entry => entry.value)
+    .filter((result) => {
+      if (!result.url || seen.has(result.url)) return false;
+      seen.add(result.url);
+      return true;
     });
-    return results.filter((result) => result.url);
-  } catch (err) {
-    console.error('[serpapi-google-lens]', err.message);
-    return [];
-  }
 }
 
 async function fetchBingImageSearch(imageUrl, signal) {
@@ -729,7 +747,7 @@ async function fetchAllAdapters(query, imageUrl) {
 
     // Run image search in parallel when imageUrl is provided
     if (imageUrl) {
-      tasks.push(fetchSerpApiGoogleLens(imageUrl, controller.signal));
+      tasks.push(fetchSerpApiGoogleLens(imageUrl, controller.signal, query));
       tasks.push(fetchGoogleLensUploadByUrl(imageUrl, controller.signal));
       tasks.push(fetchGoogleImageSearch(imageUrl, controller.signal));
       tasks.push(fetchBingImageSearch(imageUrl, controller.signal));
@@ -805,10 +823,17 @@ export default async function handler(req, res) {
       )
       .slice(0, limit);
 
+    const imageMatches = results.filter((result) => result.foundBy === 'image').length;
+
     return res.status(200).json({
       query: trimmedQuery,
       imageUrl: imageUrl ?? null,
       total: results.length,
+      diagnostics: {
+        imageSearchRequested: Boolean(hasImage),
+        imageProviderConfigured: Boolean(SERPAPI_KEY),
+        imageMatches,
+      },
       results,
     });
   } catch (err) {
