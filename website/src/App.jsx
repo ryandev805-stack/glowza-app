@@ -111,8 +111,14 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [query, store.categories.length]);
 
+  const rankedCatalog = useMemo(
+    () => store.rankedProducts(store.products),
+    [store.products, store.rotationSeed],
+  );
+  const isSearchMode = query.trim().length > 0;
+
   const filteredProducts = useMemo(() => {
-    const sourceProducts = query.trim() ? store.searchResults : store.rankedProducts(store.products);
+    const sourceProducts = isSearchMode ? store.rankedProducts(store.searchResults) : rankedCatalog;
     const products = sourceProducts.filter((product) => {
       const matchesCategory = category === 'all' || product.categoryId === category || product.categoryName === category;
       return matchesCategory;
@@ -124,11 +130,11 @@ export default function App() {
       if (sort === 'new') return Number(b.createdAt?.seconds || 0) - Number(a.createdAt?.seconds || 0);
       return 0;
     });
-  }, [store.products, store.searchResults, store.rotationSeed, query, category, sort]);
+  }, [rankedCatalog, store.searchResults, store.rotationSeed, isSearchMode, category, sort]);
 
-  const bestSellers = store.products.filter((product) => product.isBestSeller).slice(0, 8);
-  const newArrivals = store.products.filter((product) => product.isNew).slice(0, 8);
-  const flashSale = store.products.filter((product) => product.isFlashSale).slice(0, 8);
+  const bestSellers = rankedCatalog.filter((product) => product.isBestSeller).slice(0, 8);
+  const newArrivals = rankedCatalog.filter((product) => product.isNew).slice(0, 8);
+  const flashSale = rankedCatalog.filter((product) => product.isFlashSale).slice(0, 8);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -278,6 +284,7 @@ export default function App() {
             onWish={(product) => requireLogin(() => store.toggleWishlist(product.id))}
             suggestions={store.searchSuggestions}
             searching={store.searching}
+            isSearchMode={isSearchMode}
           />
         )}
         {active === 'Categories' && (
@@ -462,9 +469,9 @@ function HomePage({ store, setActive, setCategory, onOpenProduct, onCart, onWish
         </button>
       </section>
       <CategoryRail store={store} setActive={setActive} setCategory={setCategory} />
-      <ProductSection title="Flash Sale" products={flashSale} fallback={store.products.slice(0, 8)} onOpenProduct={onOpenProduct} onCart={onCart} onWish={onWish} wished={wished} />
-      <ProductSection title="Best Sellers" products={bestSellers} fallback={store.products.slice(0, 8)} onOpenProduct={onOpenProduct} onCart={onCart} onWish={onWish} wished={wished} />
-      <ProductSection title="New Arrivals" products={newArrivals} fallback={store.products.slice(0, 8)} onOpenProduct={onOpenProduct} onCart={onCart} onWish={onWish} wished={wished} />
+      <ProductSection title="Flash Sale" products={flashSale} fallback={store.rankedProducts(store.products).slice(0, 8)} onOpenProduct={onOpenProduct} onCart={onCart} onWish={onWish} wished={wished} />
+      <ProductSection title="Best Sellers" products={bestSellers} fallback={store.rankedProducts(store.products).slice(0, 8)} onOpenProduct={onOpenProduct} onCart={onCart} onWish={onWish} wished={wished} />
+      <ProductSection title="New Arrivals" products={newArrivals} fallback={store.rankedProducts(store.products).slice(0, 8)} onOpenProduct={onOpenProduct} onCart={onCart} onWish={onWish} wished={wished} />
     </div>
   );
 }
@@ -521,13 +528,14 @@ function ProductSection({ title, products, fallback, onOpenProduct, onCart, onWi
   );
 }
 
-function ShopPage({ store, products, query, setQuery, category, setCategory, sort, setSort, onOpenProduct, onCart, onWish, suggestions = [], searching = false }) {
+function ShopPage({ store, products, query, setQuery, category, setCategory, sort, setSort, onOpenProduct, onCart, onWish, suggestions = [], searching = false, isSearchMode = false }) {
   const loadMoreRef = useRef(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const canAutoLoadMore = !isSearchMode && products.length > 0 && store.hasMoreProducts;
 
   useEffect(() => {
     const node = loadMoreRef.current;
-    if (!node || !store.hasMoreProducts) return undefined;
+    if (!node || !canAutoLoadMore) return undefined;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
@@ -538,7 +546,7 @@ function ShopPage({ store, products, query, setQuery, category, setCategory, sor
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [store.hasMoreProducts, store.loadingMoreProducts, products.length]);
+  }, [canAutoLoadMore, store.loadingMoreProducts, products.length]);
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-5 sm:py-8 lg:px-8">
@@ -601,12 +609,23 @@ function ShopPage({ store, products, query, setQuery, category, setCategory, sor
       )}
       {store.loading && <p className="rounded-2xl bg-white p-6 font-bold text-glowza-pink">Loading products...</p>}
       {store.error && <p className="rounded-2xl bg-red-50 p-6 font-bold text-red-600">{store.error}</p>}
+      {!store.loading && !searching && products.length === 0 && (
+        <div className="rounded-[1.5rem] bg-white p-8 text-center shadow-glow">
+          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-pink-50 text-glowza-pink">
+            <Search size={26} />
+          </div>
+          <h2 className="text-xl font-black text-glowza-plum">No products found</h2>
+          <p className="mt-2 text-sm font-semibold text-slate-500">
+            Try another search term or clear the selected filters.
+          </p>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
         {products.map((product) => (
           <ProductCard key={product.id} product={product} wished={store.wishlist.has(product.id)} onOpen={() => onOpenProduct(product)} onCart={() => onCart(product)} onWish={() => onWish(product)} />
         ))}
       </div>
-      {store.hasMoreProducts && (
+      {canAutoLoadMore && (
         <div ref={loadMoreRef} className="mt-8 flex justify-center">
           <div className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-4 font-bold text-glowza-pink shadow-sm">
             <RefreshCcw size={17} className={store.loadingMoreProducts ? 'animate-spin' : ''} />

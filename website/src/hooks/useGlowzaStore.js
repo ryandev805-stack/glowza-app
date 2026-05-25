@@ -16,7 +16,7 @@ import {
 
 const userKey = 'glowza_web_user';
 const checkoutKey = 'glowza_web_checkout';
-const productPageSize = 20;
+const productPageSize = 80;
 
 export function useGlowzaStore() {
   const [user, setUser] = useState(() => {
