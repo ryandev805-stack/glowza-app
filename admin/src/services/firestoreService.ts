@@ -30,6 +30,28 @@ const paths = {
 const withId = <T>(snapshot: QueryDocumentSnapshot<DocumentData>) =>
   ({ id: snapshot.id, ...snapshot.data() }) as T;
 
+function buildSearchTokens(values: Array<string | undefined>) {
+  const text = values
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, ' ');
+  const words = text
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length >= 2);
+  const tokens = new Set<string>();
+  words.forEach((word) => {
+    tokens.add(word);
+    if (word.length >= 4) tokens.add(word.slice(0, 4));
+    if (word.length >= 6) tokens.add(word.slice(0, 6));
+  });
+  return {
+    searchText: text.replace(/\s+/g, ' ').trim(),
+    searchTokens: [...tokens].slice(0, 80),
+  };
+}
+
 async function readApiJson<T>(response: Response, fallbackMessage: string): Promise<T> {
   const text = await response.text();
   let body: Record<string, unknown> = {};
@@ -221,6 +243,15 @@ export async function saveProduct(input: Omit<Product, 'id'> & { id?: string }) 
       : Number(input.rating) || 0;
 
   const payload = {
+    ...buildSearchTokens([
+      input.name,
+      input.description,
+      input.brand,
+      input.productType,
+      input.skinType,
+      input.ingredients,
+      input.howToUse,
+    ]),
     name: input.name.trim(),
     description: input.description.trim(),
     price,
@@ -259,6 +290,7 @@ export async function saveProduct(input: Omit<Product, 'id'> & { id?: string }) 
     sourceVideos: input.sourceVideos || [],
     syncChangeSummary: input.syncChangeSummary || [],
     syncChangeCount: Number(input.syncChangeCount) || 0,
+    viewCount: Number(input.viewCount) || 0,
     updatedAt: serverTimestamp(),
   };
   if (input.id) {
@@ -395,6 +427,16 @@ export async function updateUserProfile(id: string, input: Partial<Pick<User, 'n
     ...input,
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function seedDemoSocialProof() {
+  const response = await fetch('/api/seed-demo-social-proof', {
+    method: 'POST',
+  });
+  return readApiJson<{ usersCreated: number; productsUpdated: number; reviewsCreated: number }>(
+    response,
+    'Could not seed demo users and reviews',
+  );
 }
 
 export async function listOrders(): Promise<Order[]> {

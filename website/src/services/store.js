@@ -4,6 +4,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  increment,
   limit,
   orderBy,
   query,
@@ -24,6 +25,46 @@ const paths = {
 };
 
 const withId = (snapshot) => ({ id: snapshot.id, ...snapshot.data() });
+
+function searchTerms(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, ' ')
+    .split(/\s+/)
+    .map((term) => term.trim())
+    .filter((term) => term.length >= 2)
+    .slice(0, 10);
+}
+
+function hashNumber(value) {
+  let hash = 2166136261;
+  const text = String(value);
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+}
+
+export function productRotationSeed(date = new Date()) {
+  return Math.floor(date.getTime() / (10 * 60 * 1000));
+}
+
+export function rankProducts(products, seed = productRotationSeed()) {
+  return [...products].sort((a, b) => {
+    const aScore =
+      hashNumber(`${a.id}-${seed}`) +
+      Math.log1p(Number(a.viewCount || 0)) * 0.18 +
+      Number(a.rating || 0) * 0.05 +
+      Math.log1p(Number(a.reviewCount || 0)) * 0.04;
+    const bScore =
+      hashNumber(`${b.id}-${seed}`) +
+      Math.log1p(Number(b.viewCount || 0)) * 0.18 +
+      Number(b.rating || 0) * 0.05 +
+      Math.log1p(Number(b.reviewCount || 0)) * 0.04;
+    return bScore - aScore;
+  });
+}
 
 export async function loginOrCreateUser({ name, phone }) {
   const snapshot = await getDocs(
@@ -85,10 +126,64 @@ export async function fetchActiveProductPage({ categoryList, pageSize = 20, curs
   const productSnapshot = await getDocs(query(collection(db, paths.products), ...constraints));
   const products = mapProducts(productSnapshot, categoryList);
   return {
-    products,
+    products: rankProducts(products),
     cursor: productSnapshot.docs[productSnapshot.docs.length - 1] || null,
     hasMore: productSnapshot.docs.length === pageSize,
   };
+}
+
+export async function searchActiveProducts({ text, categoryList, pageSize = 60 }) {
+  const terms = searchTerms(text);
+  if (terms.length === 0) {
+    const page = await fetchActiveProductPage({ categoryList, pageSize });
+    return { products: page.products, suggestions: [] };
+  }
+
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(db, paths.products),
+        where('isActive', '==', true),
+        where('searchTokens', 'array-contains-any', terms),
+        limit(pageSize),
+      ),
+    );
+    const products = rankProducts(mapProducts(snapshot, categoryList));
+    return { products, suggestions: buildSuggestions(products, terms) };
+  } catch {
+    const fallbackSnapshot = await getDocs(
+      query(collection(db, paths.products), where('isActive', '==', true), limit(120)),
+    );
+    const joined = terms.join(' ');
+    const products = rankProducts(mapProducts(fallbackSnapshot, categoryList).filter((product) => {
+      const textBody = `${product.name || ''} ${product.description || ''} ${product.categoryName || ''} ${product.brand || ''} ${product.productType || ''} ${product.searchText || ''}`.toLowerCase();
+      return terms.every((term) => textBody.includes(term)) || textBody.includes(joined);
+    })).slice(0, pageSize);
+    return { products, suggestions: buildSuggestions(products, terms) };
+  }
+}
+
+function buildSuggestions(products, terms) {
+  const suggestions = new Set();
+  products.slice(0, 12).forEach((product) => {
+    if (product.name) suggestions.add(product.name);
+    if (product.categoryName) suggestions.add(product.categoryName);
+    if (product.productType) suggestions.add(product.productType);
+  });
+  terms.forEach((term) => suggestions.add(term));
+  return [...suggestions].filter(Boolean).slice(0, 8);
+}
+
+export async function trackProductView(productId) {
+  if (!productId) return;
+  try {
+    await updateDoc(doc(db, paths.products, productId), {
+      viewCount: increment(1),
+      viewedAt: serverTimestamp(),
+    });
+  } catch {
+    // View tracking must never block product navigation.
+  }
 }
 
 export async function fetchProductById(id, categoryList) {

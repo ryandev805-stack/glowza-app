@@ -104,21 +104,27 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [store.user, authAutoShown]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void store.searchCatalog(query);
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [query, store.categories.length]);
+
   const filteredProducts = useMemo(() => {
-    const text = query.trim().toLowerCase();
-    const products = store.products.filter((product) => {
-      const matchesText = !text || `${product.name} ${product.categoryName}`.toLowerCase().includes(text);
+    const sourceProducts = query.trim() ? store.searchResults : store.rankedProducts(store.products);
+    const products = sourceProducts.filter((product) => {
       const matchesCategory = category === 'all' || product.categoryId === category || product.categoryName === category;
-      return matchesText && matchesCategory;
+      return matchesCategory;
     });
     return [...products].sort((a, b) => {
       if (sort === 'price-low') return Number(a.price || 0) - Number(b.price || 0);
       if (sort === 'price-high') return Number(b.price || 0) - Number(a.price || 0);
       if (sort === 'rated') return Number(b.rating || 0) - Number(a.rating || 0);
       if (sort === 'new') return Number(b.createdAt?.seconds || 0) - Number(a.createdAt?.seconds || 0);
-      return Number(b.reviewCount || 0) - Number(a.reviewCount || 0);
+      return 0;
     });
-  }, [store.products, query, category, sort]);
+  }, [store.products, store.searchResults, store.rotationSeed, query, category, sort]);
 
   const bestSellers = store.products.filter((product) => product.isBestSeller).slice(0, 8);
   const newArrivals = store.products.filter((product) => product.isNew).slice(0, 8);
@@ -199,6 +205,7 @@ export default function App() {
     closePopups();
     setActive('Shop');
     setSelectedProduct(product);
+    void store.trackProductView(product.id);
     const path = `/product/${encodeURIComponent(product.id)}`;
     const method = replace ? 'replaceState' : 'pushState';
     if (window.location.pathname !== path) {
@@ -269,6 +276,8 @@ export default function App() {
             onOpenProduct={openProduct}
             onCart={buyNow}
             onWish={(product) => requireLogin(() => store.toggleWishlist(product.id))}
+            suggestions={store.searchSuggestions}
+            searching={store.searching}
           />
         )}
         {active === 'Categories' && (
@@ -512,7 +521,7 @@ function ProductSection({ title, products, fallback, onOpenProduct, onCart, onWi
   );
 }
 
-function ShopPage({ store, products, query, setQuery, category, setCategory, sort, setSort, onOpenProduct, onCart, onWish }) {
+function ShopPage({ store, products, query, setQuery, category, setCategory, sort, setSort, onOpenProduct, onCart, onWish, suggestions = [], searching = false }) {
   const loadMoreRef = useRef(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -544,6 +553,20 @@ function ShopPage({ store, products, query, setQuery, category, setCategory, sor
             <span className="hidden sm:inline">Filters</span>
           </button>
         </div>
+        {(suggestions.length > 0 || searching) && (
+          <div className="hide-scrollbar mt-2 flex gap-2 overflow-x-auto pb-1">
+            {searching && <span className="rounded-full bg-pink-50 px-3 py-1.5 text-xs font-bold text-glowza-pink">Searching...</span>}
+            {suggestions.map((item) => (
+              <button
+                key={item}
+                className="shrink-0 rounded-full bg-pink-50 px-3 py-1.5 text-xs font-bold text-glowza-pink"
+                onClick={() => setQuery(item)}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {filtersOpen && (
         <Modal title="Filters" onClose={() => setFiltersOpen(false)}>

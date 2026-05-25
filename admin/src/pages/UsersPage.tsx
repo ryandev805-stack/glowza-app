@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { BadgeCheck, Ban, RefreshCcw, Save, Search, ShoppingBag, UserRound } from 'lucide-react';
-import { listOrders, listUsers, updateUserProfile } from '../services/firestoreService';
+import { BadgeCheck, Ban, RefreshCcw, Save, Search, ShoppingBag, Sparkles, UserRound } from 'lucide-react';
+import { listOrders, listUsers, seedDemoSocialProof, updateUserProfile } from '../services/firestoreService';
 import type { Order, User } from '../types';
 import { useCollection } from '../hooks/useCollection';
 
@@ -21,6 +21,9 @@ export function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [selectedId, setSelectedId] = useState('');
   const [saving, setSaving] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   const selected = users.items.find((user) => user.id === selectedId) || users.items[0] || null;
   const selectedOrders = useMemo(
@@ -59,6 +62,23 @@ export function UsersPage() {
     }
   }
 
+  async function seedDemoData() {
+    const confirmed = confirm('Create 1000 demo users and 3 approved demo reviews on every active product? Existing demo docs will be overwritten.');
+    if (!confirmed) return;
+    setSeeding(true);
+    setMessage('');
+    setError('');
+    try {
+      const result = await seedDemoSocialProof();
+      setMessage(`Seeded ${result.usersCreated} users and ${result.reviewsCreated} reviews across ${result.productsUpdated} products.`);
+      await Promise.all([users.refresh(), orders.refresh()]);
+    } catch (seedError) {
+      setError(seedError instanceof Error ? seedError.message : 'Could not seed demo data.');
+    } finally {
+      setSeeding(false);
+    }
+  }
+
   return (
     <section className="users-page admin-layout">
       <div className="page-hero compact-hero">
@@ -67,8 +87,14 @@ export function UsersPage() {
           <h1>User Management</h1>
           <p>Inspect customer profiles, role state, order value, and delivery history from Firestore.</p>
         </div>
-        <button onClick={() => { void users.refresh(); void orders.refresh(); }}><RefreshCcw size={17} /> Refresh</button>
+        <div className="actions">
+          <button className="ghost" disabled={seeding} onClick={() => void seedDemoData()}><Sparkles size={17} /> {seeding ? 'Seeding...' : 'Seed Demo Reviews'}</button>
+          <button onClick={() => { void users.refresh(); void orders.refresh(); }}><RefreshCcw size={17} /> Refresh</button>
+        </div>
       </div>
+
+      {message && <p className="success">{message}</p>}
+      {error && <p className="error">{error}</p>}
 
       <div className="metric-grid">
         <Metric title="Users" value={users.items.length} detail={`${customers} customers`} />

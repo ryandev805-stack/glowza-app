@@ -40,6 +40,9 @@ export type Product = {
   discount?: number;
   rating?: number;
   reviewCount?: number;
+  viewCount?: number;
+  searchText?: string;
+  searchTokens?: string[];
   ingredients?: string;
   howToUse?: string;
   isNew?: boolean;

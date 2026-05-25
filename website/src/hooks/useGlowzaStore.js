@@ -4,11 +4,14 @@ import {
   fetchActiveBanners,
   fetchActiveCategories,
   fetchActiveProductPage,
+  rankProducts,
   fetchProductById,
   fetchOrdersForUser,
   hasReviewForOrderProduct,
   loginOrCreateUser,
+  searchActiveProducts,
   submitReview,
+  trackProductView,
 } from '../services/store';
 
 const userKey = 'glowza_web_user';
@@ -27,6 +30,9 @@ export function useGlowzaStore() {
   const [categories, setCategories] = useState([]);
   const [banners, setBanners] = useState([]);
   const [products, setProducts] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [searching, setSearching] = useState(false);
   const [productCursor, setProductCursor] = useState(null);
   const [hasMoreProducts, setHasMoreProducts] = useState(false);
   const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
@@ -35,6 +41,7 @@ export function useGlowzaStore() {
   const [wishlist, setWishlist] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [rotationSeed, setRotationSeed] = useState(() => Math.floor(Date.now() / (10 * 60 * 1000)));
 
   const subtotal = useMemo(
     () => cart.reduce((total, item) => total + Number(item.product.price || 0) * item.quantity, 0),
@@ -47,6 +54,13 @@ export function useGlowzaStore() {
 
   useEffect(() => {
     void loadCatalog();
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setRotationSeed(Math.floor(Date.now() / (10 * 60 * 1000)));
+    }, 30000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -69,7 +83,7 @@ export function useGlowzaStore() {
       });
       setCategories(categoryData);
       setBanners(bannerData);
-      setProducts(productPage.products);
+      setProducts(rankProducts(productPage.products, rotationSeed));
       setProductCursor(productPage.cursor);
       setHasMoreProducts(productPage.hasMore);
     } catch (err) {
@@ -92,7 +106,7 @@ export function useGlowzaStore() {
       setProducts((current) => {
         const byId = new Map(current.map((product) => [product.id, product]));
         productPage.products.forEach((product) => byId.set(product.id, product));
-        return [...byId.values()];
+        return rankProducts([...byId.values()], rotationSeed);
       });
       setProductCursor(productPage.cursor);
       setHasMoreProducts(productPage.hasMore);
@@ -111,6 +125,34 @@ export function useGlowzaStore() {
       setProducts((current) => current.some((item) => item.id === product.id) ? current : [product, ...current]);
     }
     return product;
+  }
+
+  async function searchCatalog(text) {
+    const queryText = String(text || '').trim();
+    if (!queryText) {
+      setSearchResults([]);
+      setSearchSuggestions([]);
+      return;
+    }
+    setSearching(true);
+    setError('');
+    try {
+      const result = await searchActiveProducts({
+        text: queryText,
+        categoryList: categories,
+        pageSize: 80,
+      });
+      setSearchResults(result.products);
+      setSearchSuggestions(result.suggestions);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not search products');
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function rankedProducts(list = products) {
+    return rankProducts(list, rotationSeed);
   }
 
   async function refreshOrders(userId = user?.id) {
@@ -207,6 +249,9 @@ export function useGlowzaStore() {
     categories,
     banners,
     products,
+    searchResults,
+    searchSuggestions,
+    searching,
     orders,
     cart,
     wishlist,
@@ -214,6 +259,7 @@ export function useGlowzaStore() {
     loading,
     loadingMoreProducts,
     hasMoreProducts,
+    rotationSeed,
     error,
     subtotal,
     shippingFee,
@@ -223,6 +269,9 @@ export function useGlowzaStore() {
     loadCatalog,
     loadMoreProducts,
     loadProductById,
+    searchCatalog,
+    rankedProducts,
+    trackProductView,
     login,
     logout,
     addToCart,
