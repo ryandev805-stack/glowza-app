@@ -2105,6 +2105,40 @@ button.review-summary {
   transform: scale(1.05);
 }
 
+.price-optimizer-modal .search-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.price-optimizer-modal .search-mode-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.price-optimizer-modal .search-mode-tabs button,
+.price-optimizer-modal .run-search-btn {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+
+.price-optimizer-modal .search-mode-tabs button {
+  background: var(--surface-2);
+  color: var(--primary-dark);
+  box-shadow: none;
+}
+
+.price-optimizer-modal .search-mode-tabs button.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  color: white;
+}
+
 .price-optimizer-modal .modal-content-grid {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
@@ -2113,6 +2147,45 @@ button.review-summary {
 }
 
 @media (max-width: 768px) {
+  .modal-backdrop {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+  }
+
+  .modal-container.price-optimizer-modal {
+    width: 100vw;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .price-optimizer-modal .modal-header {
+    padding: 12px 14px;
+  }
+
+  .price-optimizer-modal .modal-header h2 {
+    font-size: 16px;
+  }
+
+  .price-optimizer-modal .search-mode-bar {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 10px 12px;
+  }
+
+  .price-optimizer-modal .search-mode-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .price-optimizer-modal .search-mode-tabs button,
+  .price-optimizer-modal .run-search-btn {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+  }
+
   .price-optimizer-modal .modal-content-grid {
     grid-template-columns: 1fr;
     overflow-y: auto;
@@ -2129,10 +2202,38 @@ button.review-summary {
 
 @media (max-width: 768px) {
   .price-optimizer-modal .competitors-section {
+    padding: 12px;
     border-right: 0;
     border-bottom: 1px solid var(--border);
-    max-height: 350px;
+    max-height: none;
   }
+}
+
+.price-optimizer-modal .image-search-preview {
+  position: relative;
+  margin-bottom: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: white;
+}
+
+.price-optimizer-modal .image-search-preview img {
+  display: block;
+  width: 100%;
+  max-height: 190px;
+  object-fit: contain;
+  background: var(--surface-2);
+}
+
+.price-optimizer-modal .image-search-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 900;
 }
 
 .price-optimizer-modal .section-header-compact {
@@ -2215,6 +2316,15 @@ button.review-summary {
   border-color: var(--primary-2);
 }
 
+.price-optimizer-modal .competitor-thumb {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: white;
+}
+
 .price-optimizer-modal .competitor-info {
   display: flex;
   flex-direction: column;
@@ -2230,6 +2340,19 @@ button.review-summary {
   padding: 2px 6px;
   border-radius: 6px;
   width: fit-content;
+}
+
+.price-optimizer-modal .found-by-image-tag,
+.price-optimizer-modal .no-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 999px;
+  background: rgba(176, 18, 91, 0.08);
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 900;
+  padding: 2px 6px;
 }
 
 .price-optimizer-modal .tag-daraz {
@@ -2463,6 +2586,49 @@ button.review-summary {
   font-size: 13px;
   border-radius: 14px;
   font-weight: 800;
+}
+
+@media (max-width: 768px) {
+  .price-optimizer-modal .calculator-section {
+    padding: 12px;
+  }
+
+  .price-optimizer-modal .competitor-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .price-optimizer-modal .competitor-info {
+    padding-right: 0;
+  }
+
+  .price-optimizer-modal .competitor-pricing {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .price-optimizer-modal .item-title {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .price-optimizer-modal .price-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .price-optimizer-modal .margin-selector-row,
+  .price-optimizer-modal .calc-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
 }
 
 .eyebrow.flex-row {

@@ -151,6 +151,97 @@ function addImageSearchResult(results, seen, { url, title, price = 0, image = ''
   });
 }
 
+function extractJsonLdProducts(html) {
+  const products = [];
+  const blocks = [...String(html || '').matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+  for (const block of blocks) {
+    try {
+      const parsed = JSON.parse(stripHtml(block[1]).replace(/&quot;/g, '"'));
+      const nodes = Array.isArray(parsed) ? parsed : parsed['@graph'] || [parsed];
+      nodes.forEach((node) => {
+        if (node?.['@type'] === 'Product') products.push(node);
+        if (Array.isArray(node?.itemListElement)) {
+          node.itemListElement.forEach((entry) => {
+            if (entry?.item?.['@type'] === 'Product') products.push(entry.item);
+          });
+        }
+      });
+    } catch {
+      // Skip malformed or escaped schema blocks.
+    }
+  }
+  return products;
+}
+
+function productFromHtml(html, fallbackUrl) {
+  const products = extractJsonLdProducts(html);
+  for (const product of products) {
+    const offers = Array.isArray(product.offers) ? product.offers[0] : product.offers;
+    const price = parseFloat(String(offers?.price || offers?.lowPrice || '').replace(/[^0-9.]/g, '')) || 0;
+    if (price) {
+      return {
+        title: product.name || '',
+        price,
+        image: Array.isArray(product.image) ? product.image[0] : product.image || '',
+        url: product.url || fallbackUrl,
+      };
+    }
+  }
+
+  const title =
+    String(html).match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1] ||
+    String(html).match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ||
+    '';
+  const image =
+    String(html).match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1] ||
+    '';
+  const price =
+    priceFromContext(String(html).slice(0, 120000)) ||
+    parseFloat(String(html).match(/"price"\s*:\s*"?([0-9,.]+)"?/i)?.[1]?.replace(/,/g, '') || '0') ||
+    0;
+
+  return {
+    title: stripHtml(title),
+    price,
+    image,
+    url: fallbackUrl,
+  };
+}
+
+async function enrichImageResults(results, signal) {
+  const imageResults = results.filter((result) => result.foundBy === 'image').slice(0, 10);
+  const settled = await Promise.allSettled(
+    imageResults.map(async (result) => {
+      if (result.price > 0 && result.title) return result;
+      const res = await fetch(result.url, {
+        signal,
+        headers: {
+          'User-Agent': UA,
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      if (!res.ok) return result;
+      const html = await res.text();
+      const extracted = productFromHtml(html, result.url);
+      return {
+        ...result,
+        title: extracted.title || result.title,
+        price: extracted.price || result.price,
+        image: extracted.image || result.image,
+        url: extracted.url || result.url,
+      };
+    }),
+  );
+
+  const enrichedByUrl = new Map();
+  settled.forEach((entry) => {
+    if (entry.status === 'fulfilled') enrichedByUrl.set(entry.value.url, entry.value);
+  });
+
+  return results.map((result) => enrichedByUrl.get(result.url) || result);
+}
+
 // ─── Shopify Adapter ──────────────────────────────────────────────────────────
 
 async function fetchOneShopifyStore({ domain, name }, query, signal) {
@@ -391,6 +482,40 @@ async function fetchGoogleImageSearch(imageUrl, signal) {
   return results;
 }
 
+async function fetchGoogleLensUploadByUrl(imageUrl, signal) {
+  const results = [];
+  const seen = new Set();
+  const lensUrl = `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(imageUrl)}&hl=en`;
+
+  try {
+    const res = await fetch(lensUrl, {
+      signal,
+      headers: {
+        'User-Agent': UA,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    });
+    if (!res.ok) return [];
+    const html = await res.text();
+    const rawKnownUrlRe = /https?:\\?\/\\?\/(?:www\.)?(daraz\.pk|bagallery\.com|elo\.pk|naheed\.pk|sapphireonline\.pk|sanasafinaz\.com|khaadi\.com|alkaram\.com|gul-ahmed\.com|limelight\.pk)[^"'\\<>\s]+/gi;
+    let match;
+    while ((match = rawKnownUrlRe.exec(html)) !== null && results.length < 12) {
+      const url = match[0].replace(/\\\//g, '/');
+      const ctx = html.substring(Math.max(0, match.index - 500), Math.min(html.length, match.index + 1200));
+      addImageSearchResult(results, seen, {
+        url,
+        title: stripHtml(ctx).slice(0, 130),
+        price: priceFromContext(ctx),
+      });
+    }
+  } catch (err) {
+    console.error('[google-lens-uploadbyurl]', err.message);
+  }
+
+  return results;
+}
+
 async function fetchBingImageSearch(imageUrl, signal) {
   const results = [];
   const seen = new Set();
@@ -452,15 +577,17 @@ async function fetchAllAdapters(query, imageUrl) {
 
     // Run image search in parallel when imageUrl is provided
     if (imageUrl) {
+      tasks.push(fetchGoogleLensUploadByUrl(imageUrl, controller.signal));
       tasks.push(fetchGoogleImageSearch(imageUrl, controller.signal));
       tasks.push(fetchBingImageSearch(imageUrl, controller.signal));
     }
 
     const settled = await Promise.allSettled(tasks);
 
-    return settled
+    const results = settled
       .filter(r => r.status === 'fulfilled')
       .flatMap(r => r.value);
+    return imageUrl ? enrichImageResults(results, controller.signal) : results;
   } finally {
     clearTimeout(timeout);
   }
