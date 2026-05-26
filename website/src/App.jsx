@@ -815,8 +815,10 @@ function ProductModal({ product, store, onClose, onBuyNow, onOpenRelated, onLogi
   const [quantity, setQuantity] = useState(1);
   const [activeInfo, setActiveInfo] = useState('description');
   const [added, setAdded] = useState(false);
+  const [showAllReviews, setShowAllReviews] = useState(false);
   const order = store.deliveredOrderForProduct(product.id);
   const reviews = product.reviews || [];
+  const visibleReviews = showAllReviews ? reviews : reviews.slice(0, 4);
   const gallery = [
     ...(product.videos || []).filter(Boolean).map((url) => ({ type: 'video', url })),
     ...(product.images?.length ? product.images : product.image ? [product.image] : []).filter(Boolean).map((url) => ({ type: 'image', url })),
@@ -839,6 +841,7 @@ function ProductModal({ product, store, onClose, onBuyNow, onOpenRelated, onLogi
     setActiveInfo('description');
     setAdded(false);
     setReviewOpen(false);
+    setShowAllReviews(false);
     panelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product.id, product.image, product.images, product.videos]);
@@ -1044,7 +1047,7 @@ function ProductModal({ product, store, onClose, onBuyNow, onOpenRelated, onLogi
             {!order && <p className="mt-3 rounded-2xl bg-pink-50 p-3 text-sm font-bold text-slate-600">Reviews unlock after this product is delivered to you.</p>}
             <div className="mt-4 space-y-3">
               {reviews.length === 0 && <p className="rounded-2xl bg-slate-50 p-3 text-sm font-semibold text-slate-500">No public reviews yet.</p>}
-              {reviews.slice(0, 4).map((review, index) => (
+              {visibleReviews.map((review, index) => (
                 <div key={`${review.customerName}-${index}`} className="rounded-2xl bg-pink-50 p-3">
                   <div className="flex justify-between gap-3">
                     <strong>{review.customerName || 'Glowza customer'}</strong>
@@ -1053,6 +1056,16 @@ function ProductModal({ product, store, onClose, onBuyNow, onOpenRelated, onLogi
                   <p className="mt-1 text-sm text-slate-600">{review.comment}</p>
                 </div>
               ))}
+              {reviews.length > 4 && (
+                <button
+                  type="button"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-3 text-sm font-black text-glowza-pink ring-1 ring-pink-100"
+                  onClick={() => setShowAllReviews((value) => !value)}
+                >
+                  {showAllReviews ? 'Show fewer reviews' : `View all ${reviews.length} reviews`}
+                  <ChevronRight size={16} className={showAllReviews ? '-rotate-90 transition' : 'rotate-90 transition'} />
+                </button>
+              )}
             </div>
           </div>
 
