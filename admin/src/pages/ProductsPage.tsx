@@ -10,6 +10,7 @@ import { scrapeProduct } from '../services/scraperService';
 import type { Category, Product } from '../types';
 import { useCollection } from '../hooks/useCollection';
 import { CompetitorPriceModal } from '../components/CompetitorPriceModal';
+import { AdminProgress, type ProgressState } from '../components/AdminProgress';
 
 
 const emptyProduct: Omit<Product, 'id'> = {
@@ -70,6 +71,7 @@ export function ProductsPage({
   const [syncingId, setSyncingId] = useState('');
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncProgress, setSyncProgress] = useState('');
+  const [progress, setProgress] = useState<ProgressState | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const pageSize = 10;
@@ -154,9 +156,20 @@ export function ProductsPage({
 
   async function syncProduct(product: Product) {
     setSyncingId(product.id);
+    setProgress({
+      label: 'Syncing Markaz product',
+      detail: product.name,
+      percent: 35,
+      indeterminate: true,
+    });
     try {
       const result = await syncMarkazProduct(product.id);
       await products.refresh();
+      setProgress({
+        label: result.changed ? 'Product changed' : 'Product is up to date',
+        detail: result.changed ? 'Marked inactive for review.' : product.name,
+        percent: 100,
+      });
       if (result.changed) {
         alert(`${product.name} was changed on Markaz and is now inactive for review:\n\n${(result.changeSummary || []).join('\n')}`);
       } else {
@@ -166,6 +179,7 @@ export function ProductsPage({
       alert(error instanceof Error ? error.message : 'Could not sync product');
     } finally {
       setSyncingId('');
+      window.setTimeout(() => setProgress(null), 1500);
     }
   }
 
@@ -180,6 +194,13 @@ export function ProductsPage({
 
     setSyncingAll(true);
     setSyncProgress(`0/${linkedProducts.length} synced`);
+    setProgress({
+      label: 'Syncing all Markaz products',
+      detail: 'Checking source price, stock, title, and variation data.',
+      current: 0,
+      total: linkedProducts.length,
+      percent: 0,
+    });
     let completed = 0;
     let failed = 0;
     let changedCount = 0;
@@ -198,6 +219,12 @@ export function ProductsPage({
         } finally {
           completed += 1;
           setSyncProgress(`${completed}/${linkedProducts.length} synced, ${changedCount} changed${failed ? `, ${failed} failed` : ''}`);
+          setProgress({
+            label: 'Syncing all Markaz products',
+            detail: `${changedCount} changed${failed ? `, ${failed} failed` : ''}`,
+            current: completed,
+            total: linkedProducts.length,
+          });
         }
       }
     }
@@ -205,10 +232,18 @@ export function ProductsPage({
     try {
       await Promise.all(Array.from({ length: Math.min(3, linkedProducts.length) }, worker));
       await products.refresh();
+      setProgress({
+        label: 'Sync complete',
+        detail: `${changedCount} changed${failed ? `, ${failed} failed` : ''}.`,
+        current: linkedProducts.length,
+        total: linkedProducts.length,
+        percent: 100,
+      });
       alert(`Sync complete. ${changedCount} product${changedCount === 1 ? '' : 's'} changed and were marked inactive for review.${failed ? ` ${failed} failed.` : ''}`);
     } finally {
       setSyncingId('');
       setSyncingAll(false);
+      window.setTimeout(() => setProgress(null), 1800);
     }
   }
 
@@ -254,6 +289,7 @@ export function ProductsPage({
 
         {products.loading && <p>Loading products...</p>}
         {products.error && <p className="error">{products.error}</p>}
+        <AdminProgress progress={progress} />
         <div className={`bulk-bar pro-bulk-bar ${selectedIds.size ? 'has-selection' : ''}`}>
           <div className="bulk-selection">
             <label className="check">
@@ -371,6 +407,7 @@ export function ProductEditorPage({
   const [syncing, setSyncing] = useState(false);
   const [scrapeError, setScrapeError] = useState('');
   const [showOptimizer, setShowOptimizer] = useState(false);
+  const [editorProgress, setEditorProgress] = useState<ProgressState | null>(null);
 
 
   const calculatedDiscount = useMemo(
@@ -405,10 +442,22 @@ export function ProductEditorPage({
 
   async function fillFromUrl() {
     setScraping(true);
+    setEditorProgress({
+      label: 'Filling product form',
+      detail: 'Fetching Markaz details and importing images to Cloudinary.',
+      percent: 20,
+      indeterminate: true,
+    });
     setScrapeError('');
     try {
       const scraped = await scrapeProduct(scrapeUrl);
       const rawImages = scraped.images?.length ? scraped.images : scraped.image ? [scraped.image] : [];
+      setEditorProgress({
+        label: 'Importing scraped media',
+        detail: `${rawImages.slice(0, 6).length} image${rawImages.slice(0, 6).length === 1 ? '' : 's'} queued.`,
+        percent: 55,
+        indeterminate: rawImages.length > 0,
+      });
       const cloudinaryImages = rawImages.length
         ? await Promise.all(rawImages.slice(0, 6).map((image) => importImageUrlToCloudinary(image)))
         : [];
@@ -431,16 +480,28 @@ export function ProductEditorPage({
         markazVariationName: scraped.markazVariationName || current.markazVariationName || '',
         markazVariationOptions: scraped.markazVariationOptions || current.markazVariationOptions || {},
       }));
+      setEditorProgress({
+        label: 'Form filled',
+        detail: 'Review product details before saving.',
+        percent: 100,
+      });
     } catch (error) {
       setScrapeError(error instanceof Error ? error.message : 'Scrape failed');
     } finally {
       setScraping(false);
+      window.setTimeout(() => setEditorProgress(null), 1500);
     }
   }
 
   async function syncCurrentProduct() {
     if (!productId) return;
     setSyncing(true);
+    setEditorProgress({
+      label: 'Syncing current product',
+      detail: 'Checking Markaz source changes.',
+      percent: 35,
+      indeterminate: true,
+    });
     setScrapeError('');
     try {
       const result = await syncMarkazProduct(productId);
@@ -451,24 +512,38 @@ export function ProductEditorPage({
           ? result.product.images
           : result.product.image
             ? [result.product.image]
-            : current.images,
+          : current.images,
       }));
+      setEditorProgress({
+        label: result.changed ? 'Product updated for review' : 'Product is up to date',
+        detail: result.changed ? 'Source changes were applied and product needs review.' : 'No source changes found.',
+        percent: 100,
+      });
     } catch (error) {
       setScrapeError(error instanceof Error ? error.message : 'Sync failed');
     } finally {
       setSyncing(false);
+      window.setTimeout(() => setEditorProgress(null), 1500);
     }
   }
 
   async function importGalleryUrl() {
     if (!galleryUrl.trim()) return;
     setGalleryBusy(true);
+    setEditorProgress({
+      label: 'Importing gallery image',
+      detail: 'Copying remote image to Cloudinary.',
+      percent: 45,
+      indeterminate: true,
+    });
     try {
       const uploaded = await importImageUrlToCloudinary(galleryUrl.trim());
       addGalleryImage(uploaded);
       setGalleryUrl('');
+      setEditorProgress({ label: 'Gallery image imported', percent: 100 });
     } finally {
       setGalleryBusy(false);
+      window.setTimeout(() => setEditorProgress(null), 1200);
     }
   }
 
@@ -476,25 +551,45 @@ export function ProductEditorPage({
     const selectedFiles = Array.from(files || []);
     if (selectedFiles.length === 0) return;
     setGalleryBusy(true);
+    setEditorProgress({
+      label: 'Uploading gallery images',
+      detail: `${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'} selected.`,
+      percent: 30,
+      indeterminate: true,
+    });
     try {
       const uploadedImages = await Promise.all(
         selectedFiles.map((file) => uploadToCloudinary(file)),
       );
       addGalleryImages(uploadedImages);
+      setEditorProgress({
+        label: 'Gallery upload complete',
+        detail: `${uploadedImages.length} image${uploadedImages.length === 1 ? '' : 's'} added.`,
+        percent: 100,
+      });
     } finally {
       setGalleryBusy(false);
+      window.setTimeout(() => setEditorProgress(null), 1200);
     }
   }
 
   async function importVideoUrl() {
     if (!videoUrl.trim()) return;
     setVideoBusy(true);
+    setEditorProgress({
+      label: 'Importing product video',
+      detail: 'Copying remote video to Cloudinary.',
+      percent: 45,
+      indeterminate: true,
+    });
     try {
       const uploaded = await importMediaUrlToCloudinary(videoUrl.trim());
       addVideos([uploaded]);
       setVideoUrl('');
+      setEditorProgress({ label: 'Video imported', percent: 100 });
     } finally {
       setVideoBusy(false);
+      window.setTimeout(() => setEditorProgress(null), 1200);
     }
   }
 
@@ -502,13 +597,25 @@ export function ProductEditorPage({
     const selectedFiles = Array.from(files || []);
     if (selectedFiles.length === 0) return;
     setVideoBusy(true);
+    setEditorProgress({
+      label: 'Uploading product videos',
+      detail: `${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'} selected.`,
+      percent: 25,
+      indeterminate: true,
+    });
     try {
       const uploadedVideos = await Promise.all(
         selectedFiles.map((file) => uploadToCloudinary(file)),
       );
       addVideos(uploadedVideos);
+      setEditorProgress({
+        label: 'Video upload complete',
+        detail: `${uploadedVideos.length} video${uploadedVideos.length === 1 ? '' : 's'} added.`,
+        percent: 100,
+      });
     } finally {
       setVideoBusy(false);
+      window.setTimeout(() => setEditorProgress(null), 1200);
     }
   }
 
@@ -582,6 +689,7 @@ export function ProductEditorPage({
             )}
           </div>
           {scrapeError && <p className="error">{scrapeError}</p>}
+          <AdminProgress progress={editorProgress} />
           <label>
             Saved Markaz Product Link
             <input

@@ -507,6 +507,107 @@ p {
   gap: 18px;
 }
 
+.admin-progress {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  margin: 12px 0;
+  padding: 14px;
+  border: 1px solid rgba(176, 18, 91, 0.12);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(176, 18, 91, 0.08), rgba(255, 79, 163, 0.06)),
+    #fff;
+  box-shadow: 0 14px 34px rgba(74, 11, 40, 0.07);
+}
+
+.admin-progress-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-progress-head > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-progress-head strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.admin-progress-head strong svg {
+  color: var(--primary);
+  animation: progress-spin 0.9s linear infinite;
+}
+
+.admin-progress-head span,
+.admin-progress p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.admin-progress-head b {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--primary-dark);
+  color: #fff;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.admin-progress-track {
+  position: relative;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(176, 18, 91, 0.12);
+}
+
+.admin-progress-track i {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  min-width: 6%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary-dark), var(--primary), var(--primary-2));
+  box-shadow: 0 0 18px rgba(255, 79, 163, 0.38);
+  transition: width 220ms ease;
+}
+
+.admin-progress.indeterminate .admin-progress-track i {
+  animation: progress-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes progress-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes progress-slide {
+  0% {
+    left: -45%;
+  }
+  55% {
+    left: 52%;
+  }
+  100% {
+    left: 105%;
+  }
+}
+
 .compact-form-grid {
   grid-template-columns: minmax(220px, 1.2fr) repeat(3, minmax(140px, 0.6fr));
 }

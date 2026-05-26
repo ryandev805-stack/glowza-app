@@ -5,6 +5,7 @@ import { listCategories, listProducts, saveProduct } from '../services/firestore
 import { scanWinningProducts } from '../services/winningProductService';
 import type { Category, Product, WinningProductCandidate } from '../types';
 import { useCollection } from '../hooks/useCollection';
+import { AdminProgress, type ProgressState } from '../components/AdminProgress';
 
 const defaultUrl = 'https://www.markaz.app/shop/home-page/Cosmetics/Skin%20Care';
 
@@ -34,6 +35,7 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [progress, setProgress] = useState<ProgressState | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -75,6 +77,12 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
 
   async function scan() {
     setLoading(true);
+    setProgress({
+      label: 'Scanning Markaz listing',
+      detail: 'Discovering product links and fetching detail pages.',
+      percent: 18,
+      indeterminate: true,
+    });
     setError('');
     setMessage('');
     try {
@@ -85,16 +93,28 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
         maxPrice,
       });
       const withDuplicates = applyCandidates(result);
+      setProgress({
+        label: 'Scan complete',
+        detail: `${withDuplicates.length} candidates prepared for review.`,
+        percent: 100,
+      });
       setMessage(`Found ${withDuplicates.length} candidate product${withDuplicates.length === 1 ? '' : 's'}.`);
     } catch (scanError) {
       setError(scanError instanceof Error ? scanError.message : 'Could not scan Markaz category.');
     } finally {
       setLoading(false);
+      window.setTimeout(() => setProgress(null), 1400);
     }
   }
 
   async function fetchSingleProduct() {
     setLoading(true);
+    setProgress({
+      label: 'Fetching product detail',
+      detail: 'Reading media, pricing, stock, and variations from Markaz.',
+      percent: 35,
+      indeterminate: true,
+    });
     setError('');
     setMessage('');
     try {
@@ -106,11 +126,17 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
         maxPrice,
       });
       const withDuplicates = applyCandidates(result, false);
+      setProgress({
+        label: 'Product fetched',
+        detail: `${withDuplicates.length} draft${withDuplicates.length === 1 ? '' : 's'} prepared.`,
+        percent: 100,
+      });
       setMessage(`Fetched ${withDuplicates.length} product draft${withDuplicates.length === 1 ? '' : 's'} from this Markaz URL.`);
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : 'Could not fetch Markaz product.');
     } finally {
       setLoading(false);
+      window.setTimeout(() => setProgress(null), 1400);
     }
   }
 
@@ -120,6 +146,12 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
       return;
     }
     setLoading(true);
+    setProgress({
+      label: 'Fetching URL list',
+      detail: `Preparing ${parsedBulkUrls.length} Markaz product URL${parsedBulkUrls.length === 1 ? '' : 's'}.`,
+      percent: 12,
+      indeterminate: true,
+    });
     setError('');
     setMessage('');
     try {
@@ -131,11 +163,17 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
         maxPrice,
       });
       const withDuplicates = applyCandidates(result, false);
+      setProgress({
+        label: 'URL list fetched',
+        detail: `${withDuplicates.length} product draft${withDuplicates.length === 1 ? '' : 's'} prepared.`,
+        percent: 100,
+      });
       setMessage(`Fetched ${withDuplicates.length} product draft${withDuplicates.length === 1 ? '' : 's'} from ${parsedBulkUrls.length} URL${parsedBulkUrls.length === 1 ? '' : 's'}.`);
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : 'Could not fetch Markaz product URLs.');
     } finally {
       setLoading(false);
+      window.setTimeout(() => setProgress(null), 1400);
     }
   }
 
@@ -167,13 +205,27 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
       return;
     }
     setImporting(true);
+    const importable = selected.filter((candidate) => !candidate.duplicate);
+    setProgress({
+      label: 'Importing selected products',
+      detail: 'Uploading media to Cloudinary and saving inactive Firestore drafts.',
+      current: 0,
+      total: importable.length,
+      percent: 0,
+    });
     setError('');
     setMessage('');
     try {
       let imported = 0;
       let lastId = '';
-      for (const candidate of selected) {
+      for (const candidate of importable) {
         if (candidate.duplicate) continue;
+        setProgress({
+          label: 'Importing selected products',
+          detail: candidate.name,
+          current: imported,
+          total: importable.length,
+        });
         const images = await Promise.all(
           candidate.images.slice(0, 6).map((image) => importImageUrlToCloudinary(image)),
         );
@@ -217,8 +269,21 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
           needsReview: true,
         });
         imported += 1;
+        setProgress({
+          label: 'Importing selected products',
+          detail: `${candidate.name} saved.`,
+          current: imported,
+          total: importable.length,
+        });
       }
       await products.refresh();
+      setProgress({
+        label: 'Import complete',
+        detail: `${imported} inactive draft product${imported === 1 ? '' : 's'} saved.`,
+        current: imported,
+        total: importable.length || imported || 1,
+        percent: 100,
+      });
       setMessage(`Imported ${imported} inactive draft product${imported === 1 ? '' : 's'}.`);
       setSelectedIds(new Set());
       if (imported === 1 && lastId) {
@@ -228,6 +293,7 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
       setError(importError instanceof Error ? importError.message : 'Import failed.');
     } finally {
       setImporting(false);
+      window.setTimeout(() => setProgress(null), 1600);
     }
   }
 
@@ -335,6 +401,7 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
             </div>
           </article>}
         </div>
+        <AdminProgress progress={progress} />
         {message && <p className="success">{message}</p>}
         {error && <p className="error">{error}</p>}
       </section>
@@ -357,6 +424,7 @@ export function WinningProductsPage({ onEdit }: { onEdit: (id: string) => void }
             </button>
           </div>
         </div>
+        <AdminProgress progress={importing ? progress : null} />
 
         <div className="data-list">
           {candidates.map((candidate) => (
