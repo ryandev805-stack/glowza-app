@@ -283,7 +283,10 @@ export default function App() {
           <HomePage
             store={store}
             setActive={navigate}
-            setCategory={setCategory}
+            setCategory={(nextCategory) => {
+              setQuery('');
+              setCategory(nextCategory);
+            }}
             onOpenProduct={openProduct}
             onCart={buyNow}
             onWish={(product) => requireLogin(() => store.toggleWishlist(product.id))}
@@ -311,7 +314,14 @@ export default function App() {
           />
         )}
         {active === 'Categories' && (
-          <CategoriesPage store={store} setActive={navigate} setCategory={setCategory} />
+          <CategoriesPage
+            store={store}
+            setActive={navigate}
+            setCategory={(nextCategory) => {
+              setQuery('');
+              setCategory(nextCategory);
+            }}
+          />
         )}
         {active === 'Profile' && (
           <ProfilePage store={store} onLogin={openLogin} onOpenProduct={openProduct} />
@@ -498,7 +508,7 @@ function HomePage({ store, setActive, setCategory, onOpenProduct, onCart, onWish
         </button>
       </section>
       <CategoryRail store={store} setActive={setActive} setCategory={setCategory} />
-      <HomeProducts products={products} onOpenProduct={onOpenProduct} onCart={onCart} onWish={onWish} wished={wished} />
+      <HomeProducts store={store} products={products} onOpenProduct={onOpenProduct} onCart={onCart} onWish={onWish} wished={wished} />
     </div>
   );
 }
@@ -533,8 +543,36 @@ function CategoryRail({ store, setActive, setCategory }) {
   );
 }
 
-function HomeProducts({ products, onOpenProduct, onCart, onWish, wished }) {
-  const list = products.slice(0, 24);
+function HomeProducts({ store, products, onOpenProduct, onCart, onWish, wished }) {
+  const loadMoreRef = useRef(null);
+  const list = products;
+
+  useEffect(() => {
+    if (!store.hasMoreProducts || store.loadingMoreProducts || list.length === 0) return undefined;
+    let cancelled = false;
+    const loadIfNeeded = () => {
+      if (cancelled || store.loadingMoreProducts || !store.hasMoreProducts) return;
+      const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 900;
+      if (nearBottom) void store.loadMoreProducts();
+    };
+    const observer = loadMoreRef.current
+      ? new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) void store.loadMoreProducts();
+        },
+        { rootMargin: '700px 0px' },
+      )
+      : null;
+    if (loadMoreRef.current && observer) observer.observe(loadMoreRef.current);
+    window.addEventListener('scroll', loadIfNeeded, { passive: true });
+    loadIfNeeded();
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+      window.removeEventListener('scroll', loadIfNeeded);
+    };
+  }, [store.hasMoreProducts, store.loadingMoreProducts, list.length]);
+
   if (!list.length) return null;
   return (
     <section className="mx-auto max-w-7xl px-4 lg:px-8">
@@ -551,6 +589,14 @@ function HomeProducts({ products, onOpenProduct, onCart, onWish, wished }) {
           </div>
         ))}
       </div>
+      {store.hasMoreProducts && (
+        <div ref={loadMoreRef} className="mt-8 flex justify-center">
+          <div className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-4 font-bold text-glowza-pink shadow-sm">
+            <RefreshCcw size={17} className={store.loadingMoreProducts ? 'animate-spin' : ''} />
+            {store.loadingMoreProducts ? 'Loading more products...' : 'More products loading as you scroll'}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -559,20 +605,33 @@ function ShopPage({ store, products, query, setQuery, category, setCategory, sor
   const loadMoreRef = useRef(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const canAutoLoadMore = category === 'all' && !isSearchMode && products.length > 0 && store.hasMoreProducts;
+  const selectedCategory = store.categories.find((item) => item.id === category);
 
   useEffect(() => {
+    if (!canAutoLoadMore || store.loadingMoreProducts) return undefined;
+    let cancelled = false;
+    const loadIfNeeded = () => {
+      if (cancelled || store.loadingMoreProducts || !store.hasMoreProducts) return;
+      const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 900;
+      if (nearBottom) void store.loadMoreProducts();
+    };
     const node = loadMoreRef.current;
-    if (!node || !canAutoLoadMore) return undefined;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          void store.loadMoreProducts();
-        }
-      },
-      { rootMargin: '500px 0px' },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
+    const observer = node
+      ? new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) void store.loadMoreProducts();
+        },
+        { rootMargin: '700px 0px' },
+      )
+      : null;
+    if (node && observer) observer.observe(node);
+    window.addEventListener('scroll', loadIfNeeded, { passive: true });
+    loadIfNeeded();
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+      window.removeEventListener('scroll', loadIfNeeded);
+    };
   }, [canAutoLoadMore, store.loadingMoreProducts, products.length]);
 
   return (
@@ -602,17 +661,24 @@ function ShopPage({ store, products, query, setQuery, category, setCategory, sor
             ))}
           </div>
         )}
+        {selectedCategory && !isSearchMode && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-pink-50 px-3 py-2 text-xs font-black text-glowza-pink">
+              <Grid3X3 size={14} />
+              {selectedCategory.name}
+            </span>
+            <button
+              className="rounded-full bg-white px-3 py-2 text-xs font-black text-slate-500 ring-1 ring-pink-100"
+              onClick={() => setCategory('all')}
+            >
+              View all products
+            </button>
+          </div>
+        )}
       </div>
       {filtersOpen && (
         <Modal title="Filters" onClose={() => setFiltersOpen(false)}>
           <div className="grid gap-3">
-            <label className="grid gap-2 text-sm font-bold text-glowza-plum">
-              Category
-              <select className="focus-ring rounded-2xl border border-pink-100 px-4 py-3 text-sm" value={category} onChange={(event) => setCategory(event.target.value)}>
-                <option value="all">All categories</option>
-                {store.categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
-            </label>
             <label className="grid gap-2 text-sm font-bold text-glowza-plum">
               Sort
               <select className="focus-ring rounded-2xl border border-pink-100 px-4 py-3 text-sm" value={sort} onChange={(event) => setSort(event.target.value)}>
@@ -624,7 +690,7 @@ function ShopPage({ store, products, query, setQuery, category, setCategory, sor
               </select>
             </label>
             <div className="grid grid-cols-2 gap-2 pt-2">
-              <button className="rounded-2xl bg-pink-50 px-4 py-3 text-sm font-bold text-glowza-pink" onClick={() => { setCategory('all'); setSort('popular'); }}>
+              <button className="rounded-2xl bg-pink-50 px-4 py-3 text-sm font-bold text-glowza-pink" onClick={() => { setSort('popular'); }}>
                 Reset
               </button>
               <button className="rounded-2xl bg-glowza-pink px-4 py-3 text-sm font-bold text-white" onClick={() => setFiltersOpen(false)}>
